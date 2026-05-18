@@ -13,6 +13,8 @@ import { AdminModule } from './admin/admin.module';
 import { CommonModule } from './common/common.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProjectModule } from './project/project.module';
+import { AppResolver } from './app.resolver';
+
 
 @Module({
   imports: [
@@ -43,6 +45,6 @@ import { ProjectModule } from './project/project.module';
     ProjectModule
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, AppResolver],
 })
-export class AppModule { }
+export class AppModule { }
