@@ -1,4 +1,6 @@
 import { Inject, Injectable, UnauthorizedException, ConflictException, Logger } from '@nestjs/common';
+import type { Cache } from 'cache-manager';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -10,8 +12,6 @@ import { SignupDto } from '../dto/signup.dto';
 import { IAuthService } from '../interfaces/auth.interface';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
 
 interface TokenPair {
     accessToken: string;
@@ -142,9 +142,12 @@ export class AuthService implements IAuthService {
                 const decoded = this.jwtService.decode(accessToken);
                 if (decoded && decoded['jti']) {
                     const exp = decoded['exp'] * 1000;
+                    // ttl is born right here!
                     const ttl = Math.max(0, Math.floor((exp - Date.now()) / 1000));
+
                     if (ttl > 0) {
-                        // Note: Redis blacklist is handled via CacheManager in the guard
+                        // The cache instruction must go INSIDE this block with ttl
+                        await this.cacheManager.set(`bl_${accessToken}`, true, ttl * 1000);
                     }
                 }
             }
@@ -154,11 +157,6 @@ export class AuthService implements IAuthService {
                     where: { userId: user.userId },
                     data: { revokedAt: new Date() },
                 });
-            }
-
-            if (ttl > 0) {
-                // Add to Redis blacklist with the exact TTL remaining on the token
-                await this.cacheManager.set(`bl_${accessToken}`, true, ttl * 1000);
             }
 
             this.logger.log(`User ${user.email} (ID: ${user.userId}) logged out successfully`);
