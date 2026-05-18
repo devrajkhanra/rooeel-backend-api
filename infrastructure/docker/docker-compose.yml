@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # 1. The NestJS Backend API
+  api:
+    container_name: rooeel-api
+    build:
+      context: ../../ # Points to the root directory
+      dockerfile: infrastructure/docker/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      # Internal Docker DNS automatically resolves 'postgres' and 'redis' hostnames
+      - DATABASE_URL=postgresql://postgres:rootpassword@postgres:5432/rooeel_db?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your_super_secure_jwt_secret_key
+      - JWT_ACCESS_EXPIRY=15m
+      - JWT_REFRESH_EXPIRY=7d
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    networks:
+      - rooeel-network
+
+  # 2. PostgreSQL Database
+  postgres:
+    container_name: rooeel-postgres
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=rootpassword
+      - POSTGRES_DB=rooeel_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - rooeel-network
+
+  # 3. Redis Cache (For Token Blacklisting)
+  redis:
+    container_name: rooeel-redis
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    restart: unless-stopped
+    networks:
+      - rooeel-network
+
+# Define persistent storage volumes so data survives container restarts
+volumes:
+  pgdata:
+  redisdata:
+
+    # Define an isolated network for the containers to communicate
+networks:
+  rooeel-network:
+    driver: bridge
