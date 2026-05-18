@@ -12,7 +12,10 @@ async function bootstrap() {
   // 2. Enable Helmet for secure HTTP headers
   app.use(helmet());
 
-  app.enableCors();
+  app.enableCors({
+    origin: 'http://localhost:5173',
+    credentials: true,
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
