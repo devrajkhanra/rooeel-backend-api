@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // Or "mysql" / "sqlite" depending on your stack
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  firstName String?
+  lastName  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  refreshTokens RefreshToken[]
+}
+
+model Admin {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RefreshToken {
+  id        Int       @id @default(autoincrement())
+  token     String    @unique
+  userId    Int
+  userType  String    // e.g., 'admin' or 'user'
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
