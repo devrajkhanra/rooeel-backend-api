@@ -5,22 +5,16 @@ services:
   api:
     container_name: rooeel-api
     build:
-      context: ../../ # Points to the root directory
+      context: ../../
       dockerfile: infrastructure/docker/Dockerfile
     ports:
       - "3000:3000"
-    environment:
-      - PORT=3000
-      - NODE_ENV=production
-      # Internal Docker DNS automatically resolves 'postgres' and 'redis' hostnames
-      - DATABASE_URL=postgresql://postgres:rootpassword@postgres:5432/rooeel_db?schema=public
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=your_super_secure_jwt_secret_key
-      - JWT_ACCESS_EXPIRY=15m
-      - JWT_REFRESH_EXPIRY=7d
+    env_file:
+      - ../../.env
     depends_on:
       - postgres
       - redis
+      - minio
     restart: unless-stopped
     networks:
       - rooeel-network
@@ -32,8 +26,8 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=rootpassword
+      - POSTGRES_USER=rooeel
+      - POSTGRES_PASSWORD=rooeel_pass
       - POSTGRES_DB=rooeel_db
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -41,7 +35,7 @@ services:
     networks:
       - rooeel-network
 
-  # 3. Redis Cache (For Token Blacklisting)
+  # 3. Redis Cache
   redis:
     container_name: rooeel-redis
     image: redis:7-alpine
@@ -53,12 +47,40 @@ services:
     networks:
       - rooeel-network
 
-# Define persistent storage volumes so data survives container restarts
+  # 4. MinIO (S3 Compatible Storage for PDFs)
+  minio:
+    container_name: rooeel-minio
+    image: minio/minio
+    ports:
+      - "9000:9000" # API Port
+      - "9001:9001" # Web Console Port
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin123
+    command: server /data --console-address ":9001"
+    volumes:
+      - miniodata:/data
+    restart: unless-stopped
+    networks:
+      - rooeel-network
+
+  # 5. MinIO Setup (Automatically creates your 'rooeel' bucket on startup)
+  minio-setup:
+    container_name: rooeel-minio-setup
+    image: minio/mc
+    depends_on:
+      - minio
+    networks:
+      - rooeel-network
+    entrypoint: >
+      /bin/sh -c " sleep 5; mc alias set myminio http://minio:9000 minioadmin minioadmin123; mc mb myminio/rooeel || true; mc anonymous set public myminio/rooeel; exit 0; "
+
 volumes:
   pgdata:
   redisdata:
+  miniodata:
+    # New persistent volume for your PDFs
 
-    # Define an isolated network for the containers to communicate
 networks:
   rooeel-network:
     driver: bridge
