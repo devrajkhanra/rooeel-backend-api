@@ -3,41 +3,162 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" // Or "mysql" / "sqlite" depending on your stack
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  firstName String?
-  lastName  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  refreshTokens RefreshToken[]
-}
-
 model Admin {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
+  id        Int           @id @default(autoincrement())
   firstName String
   lastName  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  email     String        @unique
+  password  String
+  createdAt DateTime      @default(now())
+  users     User[]        // One admin can create many users
+  requests  UserRequest[] // One admin can receive many requests
+  projects  Project[]     // One admin can create many projects
+}
+
+model User {
+  id        Int           @id @default(autoincrement())
+  firstName String
+  lastName  String
+  email     String        @unique
+  password  String
+  createdAt DateTime      @default(now())
+  createdBy Int?          // Foreign key to Admin (nullable for existing users)
+  admin     Admin?        @relation(fields: [createdBy], references: [id])
+  requests  UserRequest[] // One user can make many requests
+  projects  ProjectUser[] // Many-to-many relation with projects
+  assignedTasks Task[]    // Tasks assigned to this user
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  email     String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+  @@index([token])
+}
+
+model UserRequest {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  adminId        Int
+  requestType    String   // 'firstName', 'lastName', 'email', 'password'
+  currentValue   String?  // Current value (not shown for password)
+  requestedValue String?  // Requested value (not shown for password)
+  status         String   @default("pending") // 'pending', 'approved', 'rejected'
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admin          Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([adminId])
+  @@index([status])
+}
+
+model Project {
+  id          Int           @id @default(autoincrement())
+  name        String
+  description String?
+  status      String        @default("active") // 'active', 'inactive', 'completed'
+  createdBy   Int           // Foreign key to Admin
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  workOrderPdf String?     // Path to uploaded work order PDF
+  admin       Admin         @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  users       ProjectUser[] // Many-to-many relation with users
+  tasks       Task[]        // Tasks in this project
+  fields      ProjectField[]      // Dynamic field definitions
+  fieldValues ProjectFieldValue[] // Stored values for those fields
+
+  @@index([createdBy])
+  @@index([status])
+}
+
+model ProjectField {
+  id          Int                  @id @default(autoincrement())
+  projectId   Int
+  name        String               // Field name (e.g., "clientName", "siteAddress")
+  label       String               // Display label (e.g., "Client Name", "Site Address")
+  fieldType   String               // 'text', 'number', 'date', 'select', 'textarea', 'file'
+  options     Json?                // For 'select' type: [{ value: 'opt1', label: 'Option 1' }]
+  required    Boolean              @default(false)
+  sortOrder   Int                  @default(0) // Display order
+  createdAt   DateTime             @default(now())
+  project     Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  value       ProjectFieldValue?   // Current value for this field
+
+  @@index([projectId])
+}
+
+model ProjectFieldValue {
+  id        Int          @id @default(autoincrement())
+  fieldId   Int
+  projectId Int          // Denormalized for easy querying and cascade delete
+  value     String?      // The actual stored value (null = not set)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  field     ProjectField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([fieldId])    // One value per field
+  @@index([projectId])
+}
+
+model ProjectUser {
+  id         Int      @id @default(autoincrement())
+  projectId  Int
+  userId     Int
+  role       String   @default("member")
+  assignedAt DateTime @default(now())
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId]) // Prevent duplicate assignments
+  @@index([projectId])
+  @@index([userId])
+}
+
+model Task {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  status      String   @default("pending") // 'pending', 'accepted', 'in-progress', 'done'
+  type        String   @default("basic") // 'basic', 'form'
+  formSchema  Json?    // Stores the form definition for 'form' type
+  submissionData Json? // Stores user submission for 'form' type
+  projectId   Int
+  assignedTo  Int?     // Nullable, task might not be assigned yet
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee    User?    @relation(fields: [assignedTo], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([assignedTo])
 }
 
 model RefreshToken {
   id        Int       @id @default(autoincrement())
   token     String    @unique
   userId    Int
-  userType  String    // e.g., 'admin' or 'user'
+  userType  String    // 'admin' or 'user'
   expiresAt DateTime
   revokedAt DateTime?
   createdAt DateTime  @default(now())
-  
-  // Relations
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([userType])
+  @@index([token])
+  @@index([expiresAt])
 }
