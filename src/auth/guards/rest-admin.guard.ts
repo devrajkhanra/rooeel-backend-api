@@ -1,22 +1,21 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { RestAuthGuard } from './rest-auth.guard';
+import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 
 @Injectable()
-export class RestAdminGuard extends RestAuthGuard implements CanActivate {
-    async canActivate(context: ExecutionContext): Promise<boolean> {
-        // Run JWT authentication validation first
-        const authenticated = await super.canActivate(context);
-        if (!authenticated) {
-            return false;
+export class RestAdminGuard extends AuthGuard('jwt') {
+    // Overriding handleRequest lets Passport manage the async Observable natively.
+    handleRequest(err, user, info) {
+        // 1. Verify the JWT exists and is valid
+        if (err || !user) {
+            throw err || new UnauthorizedException('Authentication required');
         }
 
-        const request = context.switchToHttp().getRequest();
-        const user = request.user;
-
-        if (!user || user.role !== 'admin') {
+        // 2. Authorize the user's role
+        if (user.role !== 'admin') {
             throw new ForbiddenException('Admin access required');
         }
 
-        return true;
+        // 3. Return the user object so NestJS can inject it into the @Request() decorator
+        return user;
     }
 }

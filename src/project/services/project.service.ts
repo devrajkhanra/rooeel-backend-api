@@ -139,10 +139,10 @@ export class ProjectService {
             where: { projectId },
             orderBy: { createdAt: 'desc' },
         });
-        return workOrders.map(wo => ({
+        return Promise.all(workOrders.map(async (wo) => ({
             ...wo,
-            fileUrl: this.storage.getFileUrl(wo.fileKey),
-        }));
+            fileUrl: await this.storage.getPresignedUrl(wo.fileKey),
+        })));
     }
 
     async uploadWorkOrder(projectId: number, adminId: number, file: Express.Multer.File) {

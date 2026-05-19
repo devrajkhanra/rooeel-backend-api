@@ -17,11 +17,15 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "dev": "npm run infra:up && npx prisma generate && nest start --watch"
   },
   "dependencies": {
     "@apollo/server": "^5.5.1",
     "@as-integrations/express5": "^1.1.2",
+    "@aws-sdk/s3-request-presigner": "^3.1049.0",
     "@keyv/redis": "^5.1.6",
     "@nestjs/apollo": "^13.4.0",
     "@nestjs/cache-manager": "^3.1.2",
