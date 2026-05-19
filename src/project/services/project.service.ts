@@ -262,11 +262,38 @@ export class ProjectService {
         canEdit: boolean,
         canDelete: boolean,
     ) {
+        // Prisma upsert cannot target a nullable member inside a composite unique
+        // when that member is null, so we do a find+update/create for global permissions.
+        if (departmentId === null) {
+            const existing = await this.prisma.permission.findFirst({
+                where: { projectRoleId: roleId, resource, departmentId: null },
+            });
+
+            if (existing) {
+                return this.prisma.permission.update({
+                    where: { id: existing.id },
+                    data: { canView, canCreate, canEdit, canDelete },
+                });
+            }
+
+            return this.prisma.permission.create({
+                data: {
+                    projectRoleId: roleId,
+                    departmentId: null,
+                    resource,
+                    canView,
+                    canCreate,
+                    canEdit,
+                    canDelete,
+                },
+            });
+        }
+
         return this.prisma.permission.upsert({
             where: {
                 projectRoleId_departmentId_resource: {
                     projectRoleId: roleId,
-                    departmentId: departmentId as number,
+                    departmentId,
                     resource,
                 },
             },
@@ -385,21 +412,20 @@ export class ProjectService {
     async getUserPermission(userId: number, projectId: number, resource: string, departmentId?: number) {
         const projectUser = await this.prisma.projectUser.findUnique({
             where: { projectId_userId: { projectId, userId } },
-            include: {
-                projectRole: {
-                    include: {
-                        permissions: {
-                            where: {
-                                resource,
-                                ...(departmentId ? { departmentId } : {}),
-                            },
-                        },
-                    },
-                },
-            },
+            select: { projectRoleId: true },
         });
 
-        if (!projectUser?.projectRole) return null;
-        return projectUser.projectRole.permissions[0] ?? null;
+        if (!projectUser?.projectRoleId) return null;
+
+        if (departmentId) {
+            const scopedPermission = await this.prisma.permission.findFirst({
+                where: { projectRoleId: projectUser.projectRoleId, resource, departmentId },
+            });
+            if (scopedPermission) return scopedPermission;
+        }
+
+        return this.prisma.permission.findFirst({
+            where: { projectRoleId: projectUser.projectRoleId, resource, departmentId: null },
+        });
     }
 }
