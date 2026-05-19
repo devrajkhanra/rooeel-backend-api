@@ -14,8 +14,8 @@ import {
 import { RequestService } from './services/request.service';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { GqlUserGuard } from '../auth/guards/gql-user.guard';
-import { GqlAdminGuard } from '../auth/guards/gql-admin.guard';
+import { RestAuthGuard } from '../auth/guards/rest-auth.guard';
+import { RestAdminGuard } from '../auth/guards/rest-admin.guard';
 
 @Controller('request')
 export class RequestController {
@@ -28,7 +28,7 @@ export class RequestController {
      * For requestType 'password': verifies current password and queues the request.
      * Admin must use generate-password to fulfil it.
      */
-    @UseGuards(GqlUserGuard)
+    @UseGuards(RestAuthGuard)
     @Post()
     create(@Request() req, @Body() createRequestDto: CreateRequestDto) {
         const userId = req.user.userId;
@@ -47,7 +47,7 @@ export class RequestController {
     }
 
     /** Get all requests made by the authenticated user */
-    @UseGuards(GqlUserGuard)
+    @UseGuards(RestAuthGuard)
     @Get()
     findMyRequests(@Request() req) {
         const userId = req.user.userId;
@@ -57,7 +57,7 @@ export class RequestController {
     // ── Admin endpoints ────────────────────────────────────────────────────
 
     /** Get all pending/processed requests directed to the authenticated admin */
-    @UseGuards(GqlAdminGuard)
+    @UseGuards(RestAdminGuard)
     @Get('admin')
     findAdminRequests(@Request() req) {
         const adminId = req.user.userId;
@@ -74,7 +74,7 @@ export class RequestController {
      * Generate a random password for a password or password_reset request.
      * Returns the plain-text generated password ONCE — admin must share it with the user.
      */
-    @UseGuards(GqlAdminGuard)
+    @UseGuards(RestAdminGuard)
     @HttpCode(HttpStatus.OK)
     @Post(':id/generate-password')
     generatePassword(@Param('id', ParseIntPipe) id: number, @Request() req) {
@@ -83,7 +83,7 @@ export class RequestController {
     }
 
     /** Approve a non-password request (applies the requestedValue to the user's record) */
-    @UseGuards(GqlAdminGuard)
+    @UseGuards(RestAdminGuard)
     @Patch(':id/approve')
     approve(@Param('id', ParseIntPipe) id: number, @Request() req) {
         const adminId = req.user.userId;
@@ -91,7 +91,7 @@ export class RequestController {
     }
 
     /** Reject any pending request */
-    @UseGuards(GqlAdminGuard)
+    @UseGuards(RestAdminGuard)
     @Patch(':id/reject')
     reject(@Param('id', ParseIntPipe) id: number, @Request() req) {
         const adminId = req.user.userId;
