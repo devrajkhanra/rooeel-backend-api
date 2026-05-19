@@ -68,4 +68,100 @@ export class ProjectService {
             where: { id },
         });
     }
+
+    // --- DYNAMIC FIELDS ---
+    async getFields(projectId: number) {
+        return this.prisma.projectField.findMany({
+            where: { projectId },
+            orderBy: { sortOrder: 'asc' },
+            include: { value: true }
+        });
+    }
+
+    async createField(projectId: number, data: any) {
+        return this.prisma.projectField.create({
+            data: {
+                ...data,
+                projectId
+            }
+        });
+    }
+
+    async deleteField(fieldId: number) {
+        return this.prisma.projectField.delete({
+            where: { id: fieldId }
+        });
+    }
+
+    // --- DYNAMIC FIELD VALUES ---
+    async saveFieldValue(projectId: number, fieldId: number, value: string) {
+        return this.prisma.projectFieldValue.upsert({
+            where: { fieldId },
+            update: { value },
+            create: { fieldId, projectId, value }
+        });
+    }
+
+    // --- PROJECT USERS (MEMBERS) ---
+    async getUsers(projectId: number) {
+        return this.prisma.projectUser.findMany({
+            where: { projectId },
+            include: {
+                user: {
+                    select: { id: true, firstName: true, lastName: true, email: true }
+                }
+            }
+        });
+    }
+
+    async assignUser(projectId: number, userId: number, role: string = 'member') {
+        return this.prisma.projectUser.create({
+            data: { projectId, userId, role },
+            include: {
+                user: {
+                    select: { id: true, firstName: true, lastName: true, email: true }
+                }
+            }
+        });
+    }
+
+    async unassignUser(projectId: number, userId: number) {
+        return this.prisma.projectUser.delete({
+            where: {
+                projectId_userId: { projectId, userId }
+            }
+        });
+    }
+
+    // --- TASKS ---
+    async getTasks(projectId: number) {
+        return this.prisma.task.findMany({
+            where: { projectId },
+            include: {
+                assignee: {
+                    select: { id: true, firstName: true, lastName: true, email: true }
+                }
+            }
+        });
+    }
+
+    async createTask(projectId: number, data: any) {
+        return this.prisma.task.create({
+            data: {
+                ...data,
+                projectId
+            },
+            include: {
+                assignee: {
+                    select: { id: true, firstName: true, lastName: true, email: true }
+                }
+            }
+        });
+    }
+
+    async deleteTask(taskId: number) {
+        return this.prisma.task.delete({
+            where: { id: taskId }
+        });
+    }
 }

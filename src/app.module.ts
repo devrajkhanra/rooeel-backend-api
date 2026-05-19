@@ -13,6 +13,7 @@ import { AdminModule } from './admin/admin.module';
 import { CommonModule } from './common/common.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProjectModule } from './project/project.module';
+import { RequestModule } from './request/request.module';
 import { AppResolver } from './app.resolver';
 
 
@@ -42,7 +43,8 @@ import { AppResolver } from './app.resolver';
     UserModule,
     AdminModule,
     AuthModule,
-    ProjectModule
+    ProjectModule,
+    RequestModule
   ],
   controllers: [AppController],
   providers: [AppService, AppResolver],
