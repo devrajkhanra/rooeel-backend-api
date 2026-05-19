@@ -2,7 +2,318 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+type Admin {
+  createdAt: DateTime!
+  email: String!
+  firstName: String!
+  id: ID!
+  lastName: String!
+  updatedAt: DateTime!
+}
+
+type AuthResponse {
+  access_token: String!
+  admin: Admin
+  expiresIn: Int!
+  user: User
+}
+
+input ChangePasswordInput {
+  currentPassword: String!
+  newPassword: String!
+}
+
+input CreateAdminInput {
+  email: String!
+  firstName: String!
+  lastName: String!
+  password: String!
+}
+
+input CreateFieldInput {
+  fieldType: String!
+  label: String!
+  name: String!
+  options: String
+  required: Boolean
+  sortOrder: Int
+}
+
+input CreateProjectInput {
+  description: String
+  image: String
+  name: String!
+}
+
+input CreateSubTaskInput {
+  assignedTo: Int
+  description: String
+  formSchema: String
+  title: String!
+  type: String
+}
+
+input CreateTaskInput {
+  assignedTo: Int
+  departmentId: Int
+  description: String
+  formSchema: String
+  title: String!
+  type: String
+}
+
+input CreateUserInput {
+  email: String!
+  firstName: String!
+  lastName: String!
+  password: String!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type Department {
+  createdAt: DateTime!
+  id: Int!
+  name: String!
+  projectId: Int!
+  updatedAt: DateTime!
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+
+  """Defaults to 'user' if not provided"""
+  role: String = "user"
+}
+
+type LogoutResponse {
+  message: String!
+}
+
+type MessageResponse {
+  message: String!
+}
+
+type Mutation {
+  addProjectField(input: CreateFieldInput!, projectId: Int!): ProjectField!
+  adminResetUserPassword(id: Int!, newPassword: String!): User!
+  assignUserToDepartment(departmentId: Int!, projectId: Int!, userId: Int!): ProjectUser!
+  assignUserToProject(projectId: Int!, userId: Int!): ProjectUser!
+  changeMyPassword(changePasswordInput: ChangePasswordInput!): Boolean!
+  changeUserRole(newRoleId: Int!, projectId: Int!, userId: Int!): ProjectUser!
+  createAdmin(createAdminInput: CreateAdminInput!): Admin!
+  createDepartment(name: String!, projectId: Int!): Department!
+  createProject(createProjectInput: CreateProjectInput!): Project!
+  createProjectRole(name: String!, projectId: Int!): ProjectRole!
+  createSubTask(input: CreateSubTaskInput!, taskId: Int!): SubTask!
+  createTask(input: CreateTaskInput!, projectId: Int!): Task!
+  createUser(createUserInput: CreateUserInput!): User!
+  deleteWorkOrder(workOrderId: Int!): Boolean!
+  forgotPassword(email: String!): MessageResponse!
+  login(loginInput: LoginInput!): AuthResponse!
+  logout: LogoutResponse!
+  refreshToken: AuthResponse!
+  removeAdmin(id: Int!): Admin!
+  removeDepartment(id: Int!): Boolean!
+  removePermission(id: Int!): Boolean!
+  removeProject(id: Int!): Project!
+  removeProjectField(fieldId: Int!): Boolean!
+  removeProjectRole(id: Int!): Boolean!
+  removeSubTask(id: Int!): Boolean!
+  removeTask(id: Int!): Boolean!
+  removeUser(id: Int!): User!
+  removeUserFromDepartment(projectId: Int!, userId: Int!): ProjectUser!
+  resetPassword(newPassword: String!, token: String!): MessageResponse!
+  setFieldValue(fieldId: Int!, projectId: Int!, value: String!): ProjectFieldValue!
+  setPermission(input: SetPermissionInput!): Permission!
+  setUserRole(projectId: Int!, roleId: Int!, userId: Int!): ProjectUser!
+  signup(signupInput: SignupInput!): AuthResponse!
+  unassignUserFromProject(projectId: Int!, userId: Int!): Boolean!
+  unsetUserRole(projectId: Int!, userId: Int!): ProjectUser!
+  updateAdmin(id: Int!, updateAdminInput: UpdateAdminInput!): Admin!
+  updateDepartment(id: Int!, name: String!): Department!
+  updateMyProfile(updateUserInput: UpdateUserInput!): User!
+  updateProject(id: Int!, updateProjectInput: UpdateProjectInput!): Project!
+  updateSubTask(id: Int!, input: UpdateTaskInput!): SubTask!
+  updateTask(id: Int!, input: UpdateTaskInput!): Task!
+  updateUser(id: Int!, updateUserInput: UpdateUserInput!): User!
+}
+
+type Permission {
+  canCreate: Boolean!
+  canDelete: Boolean!
+  canEdit: Boolean!
+  canView: Boolean!
+  departmentId: Int
+  id: Int!
+  projectRoleId: Int!
+  resource: String!
+}
+
+type Project {
+  admin: Admin
+  createdAt: DateTime!
+  departments: [Department!]
+  description: String
+  fields: [ProjectField!]
+  id: Int!
+  image: String
+  name: String!
+  roles: [ProjectRole!]
+  status: String!
+  updatedAt: DateTime!
+  users: [ProjectUser!]
+  workOrders: [WorkOrderPdf!]
+}
+
+type ProjectField {
+  fieldType: String!
+  id: Int!
+  label: String!
+  name: String!
+  options: String
+  required: Boolean!
+  sortOrder: Int!
+  value: ProjectFieldValue
+}
+
+type ProjectFieldValue {
+  id: Int!
+  value: String
+}
+
+type ProjectRole {
+  createdAt: DateTime!
+  id: Int!
+  name: String!
+  projectId: Int!
+}
+
+type ProjectUser {
+  assignedAt: DateTime!
+  department: Department
+  id: Int!
+  projectId: Int!
+  projectRole: ProjectRole
+  user: User!
+  userId: Int!
+}
+
 type Query {
+  admin(id: Int!): Admin
+  admins: [Admin!]!
+  departments(projectId: Int!): [Department!]!
+
   """Basic health check for the GraphQL API"""
   healthCheck: String!
+  me: User!
+  permissions(roleId: Int!): [Permission!]!
+  project(id: Int!): Project!
+  projectFields(projectId: Int!): [ProjectField!]!
+  projectRoles(projectId: Int!): [ProjectRole!]!
+  projectUsers(projectId: Int!): [ProjectUser!]!
+  projects: [Project!]!
+  tasks(departmentId: Int, projectId: Int!): [Task!]!
+  user(id: Int!): User
+  users: [User!]!
+  workOrders(projectId: Int!): [WorkOrderPdf!]!
+}
+
+input SetPermissionInput {
+  canCreate: Boolean!
+  canDelete: Boolean!
+  canEdit: Boolean!
+  canView: Boolean!
+  departmentId: Int
+  resource: String!
+  roleId: Int!
+}
+
+input SignupInput {
+  email: String!
+  firstName: String!
+  lastName: String!
+  password: String!
+}
+
+type SubTask {
+  assignee: User
+  createdAt: DateTime!
+  description: String
+  formSchema: String
+  id: Int!
+  status: String!
+  submissionData: String
+  taskId: Int!
+  title: String!
+  type: String!
+  updatedAt: DateTime!
+}
+
+type Task {
+  assignee: User
+  createdAt: DateTime!
+  department: Department
+  departmentId: Int
+  description: String
+  formSchema: String
+  id: Int!
+  projectId: Int!
+  status: String!
+  submissionData: String
+  subtasks: [SubTask!]
+  title: String!
+  type: String!
+  updatedAt: DateTime!
+}
+
+input UpdateAdminInput {
+  email: String
+  firstName: String
+  lastName: String
+  password: String
+}
+
+input UpdateProjectInput {
+  description: String
+  image: String
+  name: String
+}
+
+input UpdateTaskInput {
+  assignedTo: Int
+  description: String
+  status: String
+  submissionData: String
+  title: String
+}
+
+input UpdateUserInput {
+  email: String
+  firstName: String
+  lastName: String
+  password: String
+}
+
+type User {
+  createdAt: DateTime!
+  createdBy: Int
+  email: String!
+  firstName: String!
+  id: ID!
+  lastName: String!
+  updatedAt: DateTime!
+}
+
+type WorkOrderPdf {
+  createdAt: DateTime!
+  fileKey: String!
+  fileName: String!
+  fileUrl: String
+  id: Int!
+  uploadedBy: Int!
 }

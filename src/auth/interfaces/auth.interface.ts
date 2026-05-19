@@ -1,21 +1,21 @@
 import { Admin, User } from '@prisma/client';
-import { SignupDto } from '../dto/signup.dto';
-import { LoginDto } from '../dto/login.dto';
+import { SignupInput } from '../dto/signup.input';
+import { LoginInput } from '../dto/login.input';
 
 export interface IAuthService {
-    signup(signupDto: SignupDto): Promise<{
+    signup(signupInput: SignupInput): Promise<{
         access_token: string;
         refresh_token: string;
         expiresIn: number;
         admin: { id: number; firstName: string; lastName: string; email: string }
     }>;
-    login(loginDto: LoginDto): Promise<{
+    login(loginInput: LoginInput): Promise<{
         access_token: string;
         refresh_token: string;
         expiresIn: number;
         user?: any;
     }>;
-    loginUser(loginDto: LoginDto): Promise<{
+    loginUser(loginInput: LoginInput): Promise<{
         access_token: string;
         refresh_token: string;
         expiresIn: number;

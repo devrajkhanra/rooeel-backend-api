@@ -15,7 +15,7 @@ export class GqlAdminGuard extends AuthGuard('jwt') {
         }
         // Assuming your token payload includes a role or boolean for admin
         // Replace `user.isAdmin` with your actual admin verification logic
-        if (user.role !== 'ADMIN' && !user.isAdmin) {
+        if (user.role !== 'admin') {
             throw new ForbiddenException('Admin access required');
         }
         return user;

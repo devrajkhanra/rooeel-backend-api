@@ -1,10 +1,13 @@
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { AuthService } from './auth.service';
+import { AuthService } from './services/auth.service';
 import { AdminService } from '../admin/services/admin.service';
-import { PasswordService } from '../admin/services/password.service';
+import { UserService } from '../user/services/user.service';
+import { PasswordService } from '../common/services/password.service';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
 describe('AuthService', () => {
     let authService: AuthService;
@@ -15,9 +18,18 @@ describe('AuthService', () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 AuthService,
-                AdminService,
-                PasswordService,
-                PrismaService,
+                { provide: AdminService, useValue: { findByEmail: jest.fn() } },
+                { provide: UserService, useValue: {} },
+                {
+                    provide: PasswordService,
+                    useValue: {
+                        hash: jest.fn().mockImplementation((p) => Promise.resolve(`hashed_${p}`)),
+                        compare: jest.fn().mockImplementation((p, h) => Promise.resolve(h === `hashed_${p}`)),
+                    },
+                },
+                { provide: PrismaService, useValue: { refreshToken: { create: jest.fn() } } },
+                { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('15m') } },
+                { provide: CACHE_MANAGER, useValue: { set: jest.fn() } },
                 {
                     provide: JwtService,
                     useValue: {
@@ -83,7 +95,9 @@ describe('AuthService', () => {
             createdAt: new Date(),
         });
 
-        const token = await authService.login({ email: mockEmail, password: mockPassword });
-        expect(token).toEqual({ access_token: 'mock_token' });
+        const result = await authService.login({ email: mockEmail, password: mockPassword, role: 'admin' });
+        expect(result.access_token).toBe('mock_token');
+        expect(result.refresh_token).toBe('mock_token');
+        expect(result.user.email).toBe(mockEmail);
     });
 });

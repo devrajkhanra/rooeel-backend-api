@@ -1,4 +1,4 @@
-import { Inject, Injectable, UnauthorizedException, ConflictException, Logger } from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import type { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { JwtService } from '@nestjs/jwt';
@@ -7,8 +7,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AdminService } from '../../admin/services/admin.service';
 import { UserService } from '../../user/services/user.service';
 import { PasswordService } from '../../common/services/password.service';
-import { LoginDto } from '../dto/login.dto';
-import { SignupDto } from '../dto/signup.dto';
+import { EmailService } from '../../common/services/email.service';
+import { LoginInput } from '../dto/login.input';
+import { SignupInput } from '../dto/signup.input';
 import { IAuthService } from '../interfaces/auth.interface';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
@@ -32,6 +33,7 @@ export class AuthService implements IAuthService {
         private passwordService: PasswordService,
         private configService: ConfigService,
         private prisma: PrismaService,
+        private emailService: EmailService,
     ) { }
 
     private async generateTokens(user: { id: number; email: string; role: string }): Promise<TokenPair> {
@@ -168,13 +170,13 @@ export class AuthService implements IAuthService {
         }
     }
 
-    async signup(signupDto: SignupDto) {
-        const existingAdmin = await this.adminService.findByEmail(signupDto.email);
+    async signup(signupInput: SignupInput) {
+        const existingAdmin = await this.adminService.findByEmail(signupInput.email);
         if (existingAdmin) {
             throw new ConflictException('Admin with this email already exists');
         }
 
-        const admin = await this.adminService.create(signupDto);
+        const admin = await this.adminService.create(signupInput);
         const tokens = await this.generateTokens({ id: admin.id, email: admin.email, role: 'admin' });
 
         return {
@@ -208,30 +210,31 @@ export class AuthService implements IAuthService {
         return null;
     }
 
-    async login(loginDto: LoginDto) {
+    async login(loginInput: LoginInput) {
         let user: any;
+        const role = loginInput.role || 'user';
 
-        if (loginDto.role === 'admin') {
-            user = await this.validateAdmin(loginDto.email, loginDto.password);
-        } else if (loginDto.role === 'user') {
-            user = await this.validateUser(loginDto.email, loginDto.password);
+        if (role === 'admin') {
+            user = await this.validateAdmin(loginInput.email, loginInput.password);
+        } else if (role === 'user') {
+            user = await this.validateUser(loginInput.email, loginInput.password);
         }
 
         if (!user) {
             throw new UnauthorizedException('Invalid credentials');
         }
 
-        const tokens = await this.generateTokens({ id: user.id, email: user.email, role: loginDto.role });
+        const tokens = await this.generateTokens({ id: user.id, email: user.email, role });
         return {
             access_token: tokens.accessToken,
             refresh_token: tokens.refreshToken,
             expiresIn: tokens.expiresIn,
-            user: { ...user, role: loginDto.role },
+            user: { ...user, role },
         };
     }
 
-    async loginUser(loginDto: LoginDto) {
-        const user = await this.validateUser(loginDto.email, loginDto.password);
+    async loginUser(loginInput: LoginInput) {
+        const user = await this.validateUser(loginInput.email, loginInput.password);
         if (!user) {
             throw new UnauthorizedException('Invalid credentials');
         }
@@ -241,5 +244,58 @@ export class AuthService implements IAuthService {
             refresh_token: tokens.refreshToken,
             expiresIn: tokens.expiresIn,
         };
+    }
+
+    async forgotPassword(email: string): Promise<{ message: string }> {
+        // Look up the user (users only — admins have internal access)
+        const user = await this.userService.findByEmail(email);
+
+        // Always return success to prevent email enumeration attacks
+        if (!user) return { message: 'If that email exists, a reset link has been sent.' };
+
+        // Invalidate any existing reset tokens for this email
+        await this.prisma.passwordResetToken.deleteMany({ where: { email } });
+
+        // Generate a secure random token
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+        await this.prisma.passwordResetToken.create({
+            data: { email, token: rawToken, expiresAt },
+        });
+
+        const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+        const resetLink = `${frontendUrl}/reset-password?token=${rawToken}`;
+
+        await this.emailService.sendPasswordResetEmail(user.email, user.firstName, resetLink, true);
+
+        this.logger.log(`Password reset link sent to ${email}`);
+        return { message: 'If that email exists, a reset link has been sent.' };
+    }
+
+    async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+        const record = await this.prisma.passwordResetToken.findUnique({ where: { token } });
+
+        if (!record) throw new BadRequestException('Invalid or expired reset token');
+        if (record.usedAt) throw new BadRequestException('Reset token has already been used');
+        if (record.expiresAt < new Date()) throw new BadRequestException('Reset token has expired');
+
+        const user = await this.userService.findByEmail(record.email);
+        if (!user) throw new BadRequestException('User not found');
+
+        const hashedPassword = await this.passwordService.hash(newPassword);
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: { password: hashedPassword },
+        });
+
+        // Mark token as used
+        await this.prisma.passwordResetToken.update({
+            where: { token },
+            data: { usedAt: new Date() },
+        });
+
+        this.logger.log(`Password reset successfully for ${record.email}`);
+        return { message: 'Password reset successfully. You can now log in.' };
     }
 }

@@ -37,7 +37,7 @@ import { StorageModule } from './storage/storage.module';
       autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
       sortSchema: true,
       playground: true,
-      context: ({ req }) => ({ req }),
+      context: ({ req, res }) => ({ req, res }),
     }),
     PrismaModule,
     CommonModule,

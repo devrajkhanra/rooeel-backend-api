@@ -1,61 +1,51 @@
-# -----------------------------------
-# Stage 1: Builder
-# -----------------------------------
-FROM node:20-alpine AS builder
-
-# THE FIX: Install OpenSSL for the Prisma Query Engine
-RUN apk add --no-cache openssl
-
+# ─── Stage 1: Base dependencies ──────────────────────────────────────────────
+FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
+RUN npm ci --frozen-lockfile
 
-# Copy prisma from inside the src folder!
-COPY src/prisma ./src/prisma/
+# ─── Stage 2: Development (hot-reload with ts-node / nest start:dev) ─────────
+FROM node:20-alpine AS development
+WORKDIR /app
 
-# Install ALL dependencies
-RUN npm ci
-
-# Tell Prisma exactly where the schema file is
-RUN npx prisma generate --schema=src/prisma/schema.prisma
-
-# Copy the rest of the application code
+# Copy all deps (including devDependencies needed for ts compilation)
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build the NestJS application
-RUN npm run build
+# Expose the API port
+EXPOSE 5000
 
-# -----------------------------------
-# Stage 2: Production
-# -----------------------------------
-FROM node:20-alpine AS production
+CMD ["npm", "run", "start:dev"]
 
-# THE FIX: Install OpenSSL for the Production runtime too
-RUN apk add --no-cache openssl
-
+# ─── Stage 3: Builder (compile TypeScript to dist/) ──────────────────────────
+FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 
-# Copy prisma from inside the src folder!
-COPY src/prisma ./src/prisma/
-
-# Install ONLY production dependencies
-RUN npm ci --omit=dev
-
-# Tell Prisma exactly where the schema file is
+# Generate Prisma client before build
 RUN npx prisma generate --schema=src/prisma/schema.prisma
 
-# Copy the compiled /dist folder from the builder stage
-COPY --from=builder /app/dist ./dist
+RUN npm run build
 
-# Set Node environment to production
+# ─── Stage 4: Production (lean, no devDeps, no src/) ─────────────────────────
+FROM node:20-alpine AS production
+WORKDIR /app
+
 ENV NODE_ENV=production
 
-# Expose the application port
-EXPOSE 3000
+# Only production deps
+COPY package*.json ./
+RUN npm ci --frozen-lockfile --omit=dev
 
-# Start the application
+# Copy compiled output and schema
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+
+# Expose port
+EXPOSE 5000
+
 CMD ["node", "dist/main"]

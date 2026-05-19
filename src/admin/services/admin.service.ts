@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateAdminDto } from '../dto/create-admin.dto';
-import { UpdateAdminDto } from '../dto/update-admin.dto';
+import { CreateAdminInput } from '../dto/create-admin.input';
+import { UpdateAdminInput } from '../dto/update-admin.input';
 import { IAdminService } from '../interfaces/admin.interface';
 import { PasswordService } from '../../common/services/password.service';
 import { CustomLogger } from '../../logger/logger.service';
@@ -19,14 +19,14 @@ export class AdminService implements IAdminService {
         this.logger.setContext(AdminService.name);
     }
 
-    async create(createAdminDto: CreateAdminDto): Promise<Admin> {
-        this.logger.debug(`Creating admin: ${createAdminDto.email}`);
-        const hashedPassword = await this.passwordService.hash(createAdminDto.password);
+    async create(createAdminInput: CreateAdminInput): Promise<Admin> {
+        this.logger.debug(`Creating admin: ${createAdminInput.email}`);
+        const hashedPassword = await this.passwordService.hash(createAdminInput.password);
         const admin = await this.prisma.admin.create({
             data: {
-                firstName: createAdminDto.firstName,
-                lastName: createAdminDto.lastName,
-                email: createAdminDto.email,
+                firstName: createAdminInput.firstName,
+                lastName: createAdminInput.lastName,
+                email: createAdminInput.email,
                 password: hashedPassword,
             },
         });
@@ -47,16 +47,16 @@ export class AdminService implements IAdminService {
         return admin;
     }
 
-    async update(id: number, updateAdminDto: UpdateAdminDto): Promise<Admin> {
+    async update(id: number, updateAdminInput: UpdateAdminInput): Promise<Admin> {
         const admin = await this.findOne(id);
         if (!admin) {
             throw new NotFoundException(`Admin with ID ${id} not found`);
         }
 
         this.logger.debug(`Updating admin: ${admin.email} (ID: ${id})`);
-        const data: any = { ...updateAdminDto };
-        if (updateAdminDto.password) {
-            data.password = await this.passwordService.hash(updateAdminDto.password);
+        const data: any = { ...updateAdminInput };
+        if (updateAdminInput.password) {
+            data.password = await this.passwordService.hash(updateAdminInput.password);
         }
 
         const updatedAdmin = await this.prisma.admin.update({

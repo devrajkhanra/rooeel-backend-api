@@ -1,118 +1,63 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, ParseIntPipe, UploadedFile, UseInterceptors } from '@nestjs/common';
+import {
+    Controller,
+    Post,
+    Delete,
+    Param,
+    UploadedFile,
+    UseInterceptors,
+    UseGuards,
+    Request,
+    ParseIntPipe,
+    BadRequestException,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { ProjectService } from './services/project.service';
-import { CreateProjectDto } from './dto/create-project.input';
-import { UpdateProjectDto } from './dto/update-project.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AdminGuard } from '../auth/guards/gql-admin.guard';
-import { FileInterceptor } from '@nestjs/platform-express'
+import { RestAdminGuard } from '../auth/guards/rest-admin.guard';
 
-@UseGuards(JwtAuthGuard, AdminGuard) // Locks the entire controller down to Admins only
-@Controller('project')
+@Controller('projects')
 export class ProjectController {
     constructor(private readonly projectService: ProjectService) { }
 
-    @Post()
-    create(@Req() req: any, @Body() createProjectDto: CreateProjectDto) {
-        // Extract the admin's ID from the JWT payload
-        const adminId = req.user.userId;
-        return this.projectService.create(adminId, createProjectDto);
-    }
-
-    @Get()
-    findAll() {
-        return this.projectService.findAll();
-    }
-
-    @Get(':id')
-    findOne(@Param('id', ParseIntPipe) id: number) {
-        return this.projectService.findOne(id);
-    }
-
-    @Patch(':id')
-    update(@Param('id', ParseIntPipe) id: number, @Body() updateProjectDto: UpdateProjectDto) {
-        return this.projectService.update(id, updateProjectDto);
-    }
-
-    @Delete(':id')
-    remove(@Param('id', ParseIntPipe) id: number) {
-        return this.projectService.remove(id);
-    }
-
+    /**
+     * POST /projects/:id/work-order
+     * Upload a Work Order PDF (multipart/form-data, field name: "file")
+     * Requires Admin authentication (Bearer token).
+     */
+    @UseGuards(RestAdminGuard)
     @Post(':id/work-order')
-    @UseInterceptors(FileInterceptor('file'))
-    async uploadWorkOrder(
-        @Param('id') projectId: string,
+    @UseInterceptors(
+        FileInterceptor('file', {
+            storage: memoryStorage(),
+            fileFilter: (req, file, cb) => {
+                if (file.mimetype !== 'application/pdf') {
+                    return cb(new BadRequestException('Only PDF files are allowed'), false);
+                }
+                cb(null, true);
+            },
+            limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB limit
+        }),
+    )
+    uploadWorkOrder(
+        @Param('id', ParseIntPipe) id: number,
         @UploadedFile() file: Express.Multer.File,
+        @Request() req: any,
     ) {
-        return this.projectService.uploadWorkOrder(Number(projectId), file);
+        if (!file) throw new BadRequestException('No file provided');
+        const adminId = req.user.userId;
+        return this.projectService.uploadWorkOrder(id, adminId, file);
     }
 
-    @Delete(':id/work-order')
-    async deleteWorkOrder(@Param('id') projectId: string) {
-        return this.projectService.deleteWorkOrder(Number(projectId));
-    }
-
-    // --- DYNAMIC FIELDS ---
-    @Get(':id/fields')
-    getFields(@Param('id', ParseIntPipe) id: number) {
-        return this.projectService.getFields(id);
-    }
-
-    @Post(':id/fields')
-    createField(@Param('id', ParseIntPipe) id: number, @Body() data: any) {
-        return this.projectService.createField(id, data);
-    }
-
-    @Delete(':id/fields/:fieldId')
-    deleteField(@Param('fieldId', ParseIntPipe) fieldId: number) {
-        return this.projectService.deleteField(fieldId);
-    }
-
-    // --- DYNAMIC FIELD VALUES ---
-    @Post(':id/fields/:fieldId/value')
-    saveFieldValue(
-        @Param('id', ParseIntPipe) id: number,
-        @Param('fieldId', ParseIntPipe) fieldId: number,
-        @Body() body: { value: string }
+    /**
+     * DELETE /projects/:projectId/work-order/:workOrderId
+     * Delete a specific Work Order PDF.
+     * Requires Admin authentication (Bearer token).
+     */
+    @UseGuards(RestAdminGuard)
+    @Delete(':projectId/work-order/:workOrderId')
+    deleteWorkOrder(
+        @Param('workOrderId', ParseIntPipe) workOrderId: number,
     ) {
-        return this.projectService.saveFieldValue(id, fieldId, body.value);
-    }
-
-    // --- PROJECT USERS (MEMBERS) ---
-    @Get(':id/users')
-    getUsers(@Param('id', ParseIntPipe) id: number) {
-        return this.projectService.getUsers(id);
-    }
-
-    @Post(':id/users')
-    assignUser(
-        @Param('id', ParseIntPipe) id: number,
-        @Body() body: { userId: number; role?: string }
-    ) {
-        return this.projectService.assignUser(id, body.userId, body.role);
-    }
-
-    @Delete(':id/users/:userId')
-    unassignUser(
-        @Param('id', ParseIntPipe) id: number,
-        @Param('userId', ParseIntPipe) userId: number
-    ) {
-        return this.projectService.unassignUser(id, userId);
-    }
-
-    // --- TASKS ---
-    @Get(':id/tasks')
-    getTasks(@Param('id', ParseIntPipe) id: number) {
-        return this.projectService.getTasks(id);
-    }
-
-    @Post(':id/tasks')
-    createTask(@Param('id', ParseIntPipe) id: number, @Body() data: any) {
-        return this.projectService.createTask(id, data);
-    }
-
-    @Delete(':id/tasks/:taskId')
-    deleteTask(@Param('taskId', ParseIntPipe) taskId: number) {
-        return this.projectService.deleteTask(taskId);
+        return this.projectService.deleteWorkOrder(workOrderId);
     }
 }

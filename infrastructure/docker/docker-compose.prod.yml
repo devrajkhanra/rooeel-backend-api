@@ -1,28 +1,26 @@
-# docker-compose.yml — DEVELOPMENT
-# Usage: docker-compose up --build
-# Hot-reload via volume mount, Prisma migrations auto-applied on startup.
+# docker-compose.prod.yml — PRODUCTION
+# Usage: docker-compose -f infrastructure/docker/docker-compose.prod.yml up --build -d
+# Uses the lean 'production' stage from the Dockerfile.
 
 version: '3.9'
 
 services:
-  # ── NestJS API (development, hot-reload) ──────────────────────────────────
+  # ── NestJS API (production build) ─────────────────────────────────────────
   api:
-    container_name: rooeel-api-dev
+    container_name: rooeel-api
     build:
       context: ../../
       dockerfile: infrastructure/docker/Dockerfile
-      target: development          # <-- uses the 'development' stage
+      target: production           # <-- lean production stage
     ports:
       - "5000:5000"
     env_file:
       - ../../.env
     environment:
-      - DATABASE_URL=postgresql://rooeel:rooeel_pass@postgres:5432/rooeel_db
-      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://rooeel:${POSTGRES_PASSWORD}@postgres:5432/rooeel_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - MINIO_ENDPOINT=minio:9000
-    volumes:
-      - ../../src:/app/src         # Hot-reload: mounts your local src/
-      - ../../.env:/app/.env
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,21 +28,21 @@ services:
         condition: service_started
       minio:
         condition: service_started
-    restart: unless-stopped
+    restart: always
     networks:
       - rooeel-network
     command: >
-      sh -c "npx prisma migrate deploy --schema=src/prisma/schema.prisma && npm run start:dev"
+      sh -c "npx prisma migrate deploy --schema=src/prisma/schema.prisma && node dist/main"
 
   # ── PostgreSQL ─────────────────────────────────────────────────────────────
   postgres:
     container_name: rooeel-postgres
     image: postgres:15-alpine
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432"            # Not exposed to host in production
     environment:
       POSTGRES_USER: rooeel
-      POSTGRES_PASSWORD: rooeel_pass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: rooeel_db
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -53,7 +51,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
+    restart: always
     networks:
       - rooeel-network
 
@@ -61,12 +59,12 @@ services:
   redis:
     container_name: rooeel-redis
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    command: redis-server --requirepass ${REDIS_PASSWORD:-rooeel_redis}
+    expose:
+      - "6379"            # Not exposed to host in production
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
       - redisdata:/data
-    restart: unless-stopped
+    restart: always
     networks:
       - rooeel-network
 
@@ -74,20 +72,21 @@ services:
   minio:
     container_name: rooeel-minio
     image: minio/minio
+    expose:
+      - "9000"
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Web Console → http://localhost:9001
+      - "9001:9001"       # Console only — use reverse proxy for S3 API in prod
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     command: server /data --console-address ":9001"
     volumes:
       - miniodata:/data
-    restart: unless-stopped
+    restart: always
     networks:
       - rooeel-network
 
-  # ── MinIO bucket setup (runs once) ────────────────────────────────────────
+  # ── MinIO bucket setup ────────────────────────────────────────────────────
   minio-setup:
     container_name: rooeel-minio-setup
     image: minio/mc
@@ -98,9 +97,8 @@ services:
     entrypoint: >
       /bin/sh -c "
         sleep 5;
-        mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin123};
+        mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
         mc mb myminio/${MINIO_BUCKET:-rooeel} || true;
-        mc anonymous set public myminio/${MINIO_BUCKET:-rooeel};
         exit 0;
       "
 

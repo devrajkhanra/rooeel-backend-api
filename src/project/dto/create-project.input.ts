@@ -1,25 +1,20 @@
-import { IsNotEmpty, IsOptional, IsString, IsIn } from 'class-validator';
-import { InputType, Field } from '@nestjs/graphql';
+import { InputType, Field, Int } from '@nestjs/graphql';
+import { IsNotEmpty, IsString, IsOptional } from 'class-validator';
 
 @InputType()
 export class CreateProjectInput {
-    @IsNotEmpty()
-    @IsString()
     @Field()
+    @IsString()
+    @IsNotEmpty()
     name: string;
 
-    @IsOptional()
+    @Field({ nullable: true })
     @IsString()
-    @Field(() => String, { nullable: true })
+    @IsOptional()
     description?: string;
 
-    @IsOptional()
-    @IsIn(['active', 'inactive', 'completed', 'planning', 'on-hold', 'cancelled', 'on-review', 'pending', 'rejected'])
-    @Field(() => String, { nullable: true })
-    status?: string;
-
-    @IsOptional()
+    @Field({ nullable: true })
     @IsString()
-    @Field(() => String, { nullable: true })
+    @IsOptional()
     image?: string;
 }

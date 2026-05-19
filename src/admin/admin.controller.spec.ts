@@ -1,18 +1,25 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AdminController } from './admin.controller';
+import { AdminResolver } from './admin.resolver';
+import { AdminService } from './services/admin.service';
 
-describe('AdminController', () => {
-  let controller: AdminController;
+describe('AdminResolver', () => {
+  let resolver: AdminResolver;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [AdminController],
+      providers: [
+        AdminResolver,
+        {
+          provide: AdminService,
+          useValue: {}, // Mock service
+        },
+      ],
     }).compile();
 
-    controller = module.get<AdminController>(AdminController);
+    resolver = module.get<AdminResolver>(AdminResolver);
   });
 
   it('should be defined', () => {
-    expect(controller).toBeDefined();
+    expect(resolver).toBeDefined();
   });
 });

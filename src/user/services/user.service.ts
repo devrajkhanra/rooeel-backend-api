@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateUserDto } from '../dto/create-user.input';
-import { UpdateUserDto } from '../dto/update-user.input';
+import { CreateUserInput } from '../dto/create-user.input';
+import { UpdateUserInput } from '../dto/update-user.input';
 import { IUserService } from '../interfaces/user.interface';
 import { PasswordService } from '../../common/services/password.service';
 import { EmailService } from '../../common/services/email.service';
@@ -21,20 +21,20 @@ export class UserService implements IUserService {
         this.logger.setContext(UserService.name);
     }
 
-    async create(createUserDto: CreateUserDto, adminId: number): Promise<User> {
+    async create(createUserInput: CreateUserInput, adminId: number): Promise<User> {
         // Check if user already exists
-        const existingUser = await this.findByEmail(createUserDto.email);
+        const existingUser = await this.findByEmail(createUserInput.email);
         if (existingUser) {
             throw new ConflictException('User with this email already exists');
         }
 
-        this.logger.debug(`Creating user: ${createUserDto.email} by admin ID: ${adminId}`);
-        const hashedPassword = await this.passwordService.hash(createUserDto.password);
+        this.logger.debug(`Creating user: ${createUserInput.email} by admin ID: ${adminId}`);
+        const hashedPassword = await this.passwordService.hash(createUserInput.password);
         const user = await this.prisma.user.create({
             data: {
-                firstName: createUserDto.firstName,
-                lastName: createUserDto.lastName,
-                email: createUserDto.email,
+                firstName: createUserInput.firstName,
+                lastName: createUserInput.lastName,
+                email: createUserInput.email,
                 password: hashedPassword,
                 createdBy: adminId,
             },
@@ -56,16 +56,16 @@ export class UserService implements IUserService {
         return user;
     }
 
-    async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
+    async update(id: number, updateUserInput: UpdateUserInput): Promise<User> {
         const user = await this.findOne(id);
         if (!user) {
             throw new NotFoundException(`User with ID ${id} not found`);
         }
 
         this.logger.debug(`Updating user: ${user.email} (ID: ${id})`);
-        const data: any = { ...updateUserDto };
-        if (updateUserDto.password) {
-            data.password = await this.passwordService.hash(updateUserDto.password);
+        const data: any = { ...updateUserInput };
+        if (updateUserInput.password) {
+            data.password = await this.passwordService.hash(updateUserInput.password);
         }
 
         const updatedUser = await this.prisma.user.update({
@@ -125,15 +125,15 @@ export class UserService implements IUserService {
         return user;
     }
 
-    async updateMyProfile(userId: number, updateUserDto: UpdateUserDto): Promise<User> {
+    async updateMyProfile(userId: number, updateUserInput: UpdateUserInput): Promise<User> {
         const user = await this.findOne(userId);
         if (!user) {
             throw new NotFoundException(`User with ID ${userId} not found`);
         }
 
         // If email is being changed, check it's not already taken
-        if (updateUserDto.email && updateUserDto.email !== user.email) {
-            const existingUser = await this.findByEmail(updateUserDto.email);
+        if (updateUserInput.email && updateUserInput.email !== user.email) {
+            const existingUser = await this.findByEmail(updateUserInput.email);
             if (existingUser) {
                 throw new ConflictException('Email is already in use');
             }
@@ -144,9 +144,9 @@ export class UserService implements IUserService {
         const updatedUser = await this.prisma.user.update({
             where: { id: userId },
             data: {
-                firstName: updateUserDto.firstName ?? user.firstName,
-                lastName: updateUserDto.lastName ?? user.lastName,
-                email: updateUserDto.email ?? user.email,
+                firstName: updateUserInput.firstName ?? user.firstName,
+                lastName: updateUserInput.lastName ?? user.lastName,
+                email: updateUserInput.email ?? user.email,
             },
         });
 

@@ -1,13 +1,14 @@
 // user.interface.ts
 import { User } from '@prisma/client';
-import { CreateUserDto } from '../dto/create-user.input';
-import { UpdateUserDto } from '../dto/update-user.input';
+import { CreateUserInput } from '../dto/create-user.input';
+import { UpdateUserInput } from '../dto/update-user.input';
+
 
 export interface IUserService {
-    create(createUserDto: CreateUserDto, adminId: number): Promise<User>;
+    create(createUserDto: CreateUserInput, adminId: number): Promise<User>;
     findAll(): Promise<User[]>;
     findOne(id: number): Promise<User | null>;
-    update(id: number, updateUserDto: UpdateUserDto): Promise<User>;
+    update(id: number, updateUserDto: UpdateUserInput): Promise<User>;
     remove(id: number): Promise<void>;
     findByEmail(email: string): Promise<User | null>;
 }
