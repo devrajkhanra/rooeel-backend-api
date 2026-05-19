@@ -27,8 +27,10 @@ export class ProjectService {
         return this.prisma.project.findMany({
             orderBy: { createdAt: 'desc' },
             include: {
-                _count: { select: { users: true, tasks: true, workOrders: true } },
                 admin: { select: { id: true, firstName: true, lastName: true } },
+                users: { select: { id: true } },
+                tasks: { select: { id: true } },
+                workOrders: { select: { id: true } },
             },
         });
     }
@@ -79,7 +81,7 @@ export class ProjectService {
         const workOrdersWithUrls = await Promise.all(
             project.workOrders.map(async (wo) => ({
                 ...wo,
-                fileUrl: await this.storage.getPresignedUrl(wo.fileKey),
+                fileUrl: await this.storage.getPresignedUrl(wo.fileKey, wo.fileName),
             })),
         );
         return { ...project, workOrders: workOrdersWithUrls };
@@ -171,7 +173,7 @@ export class ProjectService {
         });
         return Promise.all(workOrders.map(async (wo) => ({
             ...wo,
-            fileUrl: await this.storage.getPresignedUrl(wo.fileKey),
+            fileUrl: await this.storage.getPresignedUrl(wo.fileKey, wo.fileName),
         })));
     }
 
@@ -185,7 +187,7 @@ export class ProjectService {
         const workOrder = await this.prisma.workOrderPdf.create({
             data: { projectId, fileKey, fileName: displayName, uploadedBy: adminId },
         });
-        return { ...workOrder, fileUrl: await this.storage.getPresignedUrl(fileKey) };
+        return { ...workOrder, fileUrl: await this.storage.getPresignedUrl(fileKey, workOrder.fileName) };
     }
 
     async deleteWorkOrder(workOrderId: number) {
@@ -193,6 +195,20 @@ export class ProjectService {
         await this.storage.deleteFile(wo.fileKey);
         await this.prisma.workOrderPdf.delete({ where: { id: workOrderId } });
         return true;
+    }
+
+    async getWorkOrderForViewing(projectId: number, workOrderId: number) {
+        const workOrder = await this.prisma.workOrderPdf.findFirst({
+            where: { id: workOrderId, projectId },
+        });
+        if (!workOrder) {
+            throw new NotFoundException(`Work order with ID ${workOrderId} not found in project ${projectId}`);
+        }
+        const stream = await this.storage.getFileStream(workOrder.fileKey);
+        return {
+            stream,
+            fileName: workOrder.fileName,
+        };
     }
 
     // ─── ROLES ───────────────────────────────────────────────────

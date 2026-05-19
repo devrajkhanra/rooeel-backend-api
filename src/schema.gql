@@ -165,6 +165,7 @@ type Project {
   name: String!
   roles: [ProjectRole!]
   status: String!
+  tasks: [Task!]
   updatedAt: DateTime!
   users: [ProjectUser!]
   workOrders: [WorkOrderPdf!]
@@ -176,6 +177,7 @@ type ProjectField {
   label: String!
   name: String!
   options: String
+  projectId: Int!
   required: Boolean!
   sortOrder: Int!
   value: ProjectFieldValue

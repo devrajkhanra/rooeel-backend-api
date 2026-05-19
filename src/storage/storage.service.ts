@@ -3,6 +3,7 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
+import { Readable } from 'stream';
 
 @Injectable()
 export class StorageService {
@@ -41,10 +42,13 @@ export class StorageService {
         this.s3Client = new S3Client(s3Config);
     }
 
-    async getPresignedUrl(fileKey: string): Promise<string> {
+    async getPresignedUrl(fileKey: string, fileName?: string): Promise<string> {
+        const safeName = fileName || fileKey.split('/').pop() || 'document.pdf';
         const command = new GetObjectCommand({
             Bucket: this.bucketName,
             Key: fileKey,
+            ResponseContentType: 'application/pdf',
+            ResponseContentDisposition: `inline; filename="${safeName}"`,
         });
 
         // URL expires in 15 minutes
@@ -82,6 +86,21 @@ export class StorageService {
         } catch (error) {
             console.error('S3 Delete Error:', error);
             throw new InternalServerErrorException('Failed to delete file from storage');
+        }
+    }
+
+    async getFileStream(fileKey: string): Promise<Readable> {
+        try {
+            const result = await this.s3Client.send(
+                new GetObjectCommand({
+                    Bucket: this.bucketName,
+                    Key: fileKey,
+                }),
+            );
+            return result.Body as Readable;
+        } catch (error) {
+            console.error('S3 Stream Error:', error);
+            throw new InternalServerErrorException('Failed to read file from storage');
         }
     }
 

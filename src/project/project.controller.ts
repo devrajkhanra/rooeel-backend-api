@@ -2,6 +2,7 @@ import {
     Controller,
     Post,
     Delete,
+    Get,
     Param,
     UploadedFile,
     UseInterceptors,
@@ -10,11 +11,13 @@ import {
     ParseIntPipe,
     BadRequestException,
     Body,
+    Res,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ProjectService } from './services/project.service';
 import { RestAdminGuard } from '../auth/guards/rest-admin.guard';
+import type { Response } from 'express';
 
 @Controller('project')
 export class ProjectController {
@@ -51,5 +54,18 @@ export class ProjectController {
         @Param('workOrderId', ParseIntPipe) workOrderId: number,
     ) {
         return this.projectService.deleteWorkOrder(workOrderId);
+    }
+
+    @UseGuards(RestAdminGuard)
+    @Get(':projectId/work-order/:workOrderId/view')
+    async viewWorkOrder(
+        @Param('projectId', ParseIntPipe) projectId: number,
+        @Param('workOrderId', ParseIntPipe) workOrderId: number,
+        @Res() res: Response,
+    ) {
+        const { stream, fileName } = await this.projectService.getWorkOrderForViewing(projectId, workOrderId);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+        stream.pipe(res);
     }
 }

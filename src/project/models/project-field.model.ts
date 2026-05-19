@@ -14,6 +14,9 @@ export class ProjectField {
     @Field(() => Int)
     id: number;
 
+    @Field(() => Int)
+    projectId: number;
+
     @Field()
     name: string;
 
