@@ -10,7 +10,9 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   // 2. Enable Helmet for secure HTTP headers
-  app.use(helmet());
+  app.use(helmet({
+    contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
+  }));
 
   app.enableCors({
     origin: 'http://localhost:5173',

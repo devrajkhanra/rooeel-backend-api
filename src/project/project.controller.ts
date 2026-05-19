@@ -15,15 +15,10 @@ import { memoryStorage } from 'multer';
 import { ProjectService } from './services/project.service';
 import { RestAdminGuard } from '../auth/guards/rest-admin.guard';
 
-@Controller('projects')
+@Controller('project')
 export class ProjectController {
     constructor(private readonly projectService: ProjectService) { }
 
-    /**
-     * POST /projects/:id/work-order
-     * Upload a Work Order PDF (multipart/form-data, field name: "file")
-     * Requires Admin authentication (Bearer token).
-     */
     @UseGuards(RestAdminGuard)
     @Post(':id/work-order')
     @UseInterceptors(
@@ -48,11 +43,6 @@ export class ProjectController {
         return this.projectService.uploadWorkOrder(id, adminId, file);
     }
 
-    /**
-     * DELETE /projects/:projectId/work-order/:workOrderId
-     * Delete a specific Work Order PDF.
-     * Requires Admin authentication (Bearer token).
-     */
     @UseGuards(RestAdminGuard)
     @Delete(':projectId/work-order/:workOrderId')
     deleteWorkOrder(

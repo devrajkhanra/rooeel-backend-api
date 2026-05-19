@@ -21,7 +21,16 @@ export class StorageService {
 
         if (this.isMinio) {
             // --- DEVELOPMENT (MinIO) CONFIGURATION ---
-            s3Config.endpoint = `http://${this.configService.get<string>('MINIO_ENDPOINT')}`; // http://minio:9000
+            let endpoint = this.configService.get<string>('MINIO_ENDPOINT') || 'localhost:9000';
+            
+            // Self-healing: if the endpoint hostname is "minio" but we are running outside of Docker (on Windows host),
+            // dynamically swap "minio" with "localhost" so DNS resolution succeeds.
+            const isDocker = require('fs').existsSync('/.dockerenv');
+            if (!isDocker && endpoint.includes('minio')) {
+                endpoint = endpoint.replace('minio', 'localhost');
+            }
+
+            s3Config.endpoint = `http://${endpoint}`;
             s3Config.forcePathStyle = true; // Crucial for MinIO to work
             s3Config.credentials = {
                 accessKeyId: this.configService.get<string>('MINIO_ROOT_USER'),
