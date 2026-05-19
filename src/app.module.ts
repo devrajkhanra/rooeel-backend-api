@@ -15,6 +15,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ProjectModule } from './project/project.module';
 import { RequestModule } from './request/request.module';
 import { AppResolver } from './app.resolver';
+import { StorageModule } from './storage/storage.module';
 
 
 @Module({
@@ -44,9 +45,10 @@ import { AppResolver } from './app.resolver';
     AdminModule,
     AuthModule,
     ProjectModule,
-    RequestModule
+    RequestModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [AppService, AppResolver],
 })
-export class AppModule { }
+export class AppModule { }
