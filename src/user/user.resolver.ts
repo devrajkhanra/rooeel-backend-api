@@ -47,11 +47,7 @@ export class UserResolver {
     @UseGuards(GqlAdminGuard)
     @Mutation(() => User, { name: 'removeUser' })
     async remove(@Args('id', { type: () => Int }) id: number) {
-        // Note: The service currently returns void, so you might want to return the removed ID 
-        // or update the service to return the deleted User record.
-        await this.userService.remove(id);
-        // Stub return to satisfy GraphQL type, or modify service to return deleted user
-        return { id };
+        return this.userService.remove(id);
     }
 
     @UseGuards(GqlAdminGuard)

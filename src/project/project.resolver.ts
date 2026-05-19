@@ -173,6 +173,12 @@ export class ProjectResolver {
         return this.projectService.findAll();
     }
 
+    @UseGuards(GqlUserGuard)
+    @Query(() => [Project], { name: 'myProjects' })
+    findMine(@CurrentUser() user: any) {
+        return this.projectService.getUserProjects(user.userId);
+    }
+
     @UseGuards(GqlUserGuard) // Both admin and user can see project details
     @Query(() => Project, { name: 'project' })
     findOne(@Args('id', { type: () => Int }) id: number) {

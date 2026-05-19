@@ -9,6 +9,6 @@ export interface IUserService {
     findAll(): Promise<User[]>;
     findOne(id: number): Promise<User | null>;
     update(id: number, updateUserDto: UpdateUserInput): Promise<User>;
-    remove(id: number): Promise<void>;
+    remove(id: number): Promise<User>;
     findByEmail(email: string): Promise<User | null>;
 }

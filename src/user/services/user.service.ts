@@ -76,14 +76,15 @@ export class UserService implements IUserService {
         return updatedUser;
     }
 
-    async remove(id: number): Promise<void> {
+    async remove(id: number): Promise<User> {
         const user = await this.findOne(id);
         if (!user) {
             throw new NotFoundException(`User with ID ${id} not found`);
         }
         this.logger.warn(`Deleting user: ${user.email} (ID: ${id})`);
-        await this.prisma.user.delete({ where: { id } });
+        const deletedUser = await this.prisma.user.delete({ where: { id } });
         this.logger.log(`User deleted successfully: ${user.email} (ID: ${id})`);
+        return deletedUser;
     }
 
     async findByEmail(email: string): Promise<User | null> {

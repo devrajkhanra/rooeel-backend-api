@@ -33,6 +33,30 @@ export class ProjectService {
         });
     }
 
+    async getUserProjects(userId: number) {
+        const memberships = await this.prisma.projectUser.findMany({
+            where: { userId },
+            include: {
+                project: {
+                    include: {
+                        admin: { select: { id: true, firstName: true, lastName: true } },
+                        users: {
+                            include: {
+                                user: { select: { id: true, firstName: true, lastName: true, email: true } },
+                                projectRole: true,
+                                department: true,
+                            },
+                        },
+                        workOrders: { orderBy: { createdAt: 'desc' } },
+                        tasks: true,
+                    },
+                },
+            },
+        });
+
+        return memberships.map((m) => m.project);
+    }
+
     async findOne(id: number) {
         const project = await this.prisma.project.findUnique({
             where: { id },
@@ -52,7 +76,13 @@ export class ProjectService {
             },
         });
         if (!project) throw new NotFoundException(`Project with ID ${id} not found`);
-        return project;
+        const workOrdersWithUrls = await Promise.all(
+            project.workOrders.map(async (wo) => ({
+                ...wo,
+                fileUrl: await this.storage.getPresignedUrl(wo.fileKey),
+            })),
+        );
+        return { ...project, workOrders: workOrdersWithUrls };
     }
 
     async update(id: number, input: UpdateProjectInput) {
@@ -145,13 +175,17 @@ export class ProjectService {
         })));
     }
 
-    async uploadWorkOrder(projectId: number, adminId: number, file: Express.Multer.File) {
+    async uploadWorkOrder(projectId: number, adminId: number, file: Express.Multer.File, name?: string) {
         await this.findOne(projectId);
         const fileKey = await this.storage.uploadFile(file, 'work-orders');
+        const baseName = (name || file.originalname.replace(/\.pdf$/i, '')).trim();
+        const safeName = baseName.replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim() || 'Work Order';
+        const datePart = new Date().toISOString().split('T')[0];
+        const displayName = `${safeName} - ${datePart}.pdf`;
         const workOrder = await this.prisma.workOrderPdf.create({
-            data: { projectId, fileKey, fileName: file.originalname, uploadedBy: adminId },
+            data: { projectId, fileKey, fileName: displayName, uploadedBy: adminId },
         });
-        return { ...workOrder, fileUrl: this.storage.getFileUrl(fileKey) };
+        return { ...workOrder, fileUrl: await this.storage.getPresignedUrl(fileKey) };
     }
 
     async deleteWorkOrder(workOrderId: number) {

@@ -9,6 +9,7 @@ import {
     Request,
     ParseIntPipe,
     BadRequestException,
+    Body,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -36,11 +37,12 @@ export class ProjectController {
     uploadWorkOrder(
         @Param('id', ParseIntPipe) id: number,
         @UploadedFile() file: Express.Multer.File,
+        @Body('name') name: string | undefined,
         @Request() req: any,
     ) {
         if (!file) throw new BadRequestException('No file provided');
         const adminId = req.user.userId;
-        return this.projectService.uploadWorkOrder(id, adminId, file);
+        return this.projectService.uploadWorkOrder(id, adminId, file, name);
     }
 
     @UseGuards(RestAdminGuard)

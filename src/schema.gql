@@ -211,6 +211,7 @@ type Query {
   """Basic health check for the GraphQL API"""
   healthCheck: String!
   me: User!
+  myProjects: [Project!]!
   permissions(roleId: Int!): [Permission!]!
   project(id: Int!): Project!
   projectFields(projectId: Int!): [ProjectField!]!
