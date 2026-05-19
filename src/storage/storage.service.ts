@@ -20,8 +20,11 @@ export class StorageService {
 
         if (this.isMinio) {
             // --- DEVELOPMENT (MinIO) CONFIGURATION ---
-            // Force the endpoint to localhost:9000 for local Windows host access
-            s3Config.endpoint = 'http://localhost:9000';
+            const minioEndpoint = this.configService.get<string>('MINIO_ENDPOINT') || 'localhost:9000';
+            const normalizedEndpoint = minioEndpoint.startsWith('http')
+                ? minioEndpoint
+                : `http://${minioEndpoint}`;
+            s3Config.endpoint = normalizedEndpoint;
             s3Config.forcePathStyle = true;
             s3Config.credentials = {
                 accessKeyId: this.configService.get<string>('MINIO_ROOT_USER') || 'minioadmin',
