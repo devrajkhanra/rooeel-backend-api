@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, ParseIntPipe, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ProjectService } from './services/project.service';
-import { CreateProjectDto } from './dto/create-project.dto';
+import { CreateProjectDto } from './dto/create-project.input';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
