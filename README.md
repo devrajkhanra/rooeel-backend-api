@@ -27,6 +27,102 @@ The PostgreSQL database is organized into 10 key tables, utilizing cascade delet
 
 ```mermaid
 erDiagram
+    Admin {
+        Int id PK
+        String firstName
+        String lastName
+        String email UK
+        String password
+        DateTime createdAt
+    }
+    User {
+        Int id PK
+        String firstName
+        String lastName
+        String email UK
+        String password
+        DateTime createdAt
+        Int createdBy FK
+    }
+    PasswordResetToken {
+        Int id PK
+        String email
+        String token UK
+        DateTime expiresAt
+        DateTime usedAt
+        DateTime createdAt
+    }
+    UserRequest {
+        Int id PK
+        Int userId FK
+        Int adminId FK
+        String requestType
+        String currentValue
+        String requestedValue
+        String status
+        DateTime createdAt
+        DateTime updatedAt
+    }
+    Project {
+        Int id PK
+        String name
+        String description
+        String status
+        Int createdBy FK
+        DateTime createdAt
+        DateTime updatedAt
+        String workOrderPdf
+    }
+    ProjectField {
+        Int id PK
+        Int projectId FK
+        String name
+        String label
+        String fieldType
+        Json options
+        Boolean required
+        Int sortOrder
+        DateTime createdAt
+    }
+    ProjectFieldValue {
+        Int id PK
+        Int fieldId FK
+        Int projectId FK
+        String value
+        DateTime createdAt
+        DateTime updatedAt
+    }
+    ProjectUser {
+        Int id PK
+        Int projectId FK
+        Int userId FK
+        String role
+        DateTime assignedAt
+    }
+    Task {
+        Int id PK
+        String title
+        String description
+        String status
+        String type
+        Json formSchema
+        Json submissionData
+        Int projectId FK
+        Int assignedTo FK
+        DateTime createdAt
+        DateTime updatedAt
+    }
+    RefreshToken {
+        Int id PK
+        String token UK
+        Int userId
+        String userType
+        DateTime expiresAt
+        DateTime revokedAt
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
     Admin ||--o{ User : "creates"
     Admin ||--o{ Project : "creates"
     Admin ||--o{ UserRequest : "receives"
@@ -210,6 +306,28 @@ User (Create request) ──> Request queued ──> Admin (generate-password) �
 3.  **Secure Generation**: The admin triggers `POST /api/v1/request/:id/generate-password`.
 4.  **One-Time Payload**: The system generates a strong, secure random password, hashes it using `bcrypt` to update the user's record, and returns the **plain-text password to the admin exactly once**.
 5.  **Secure Share**: The admin copies the plain-text password and shares it with the user. It is never displayed or returned in any API payload again.
+
+---
+
+## 📦 High-Performance Cloud Storage Architecture (S3 / MinIO)
+
+Rooeel implements a robust S3-compatible object storage layer via the `StorageService` to govern physical project assets (such as work orders or document uploads).
+
+### Dynamic Storage Providers
+```
+          ┌────────────── USE_MINIO=true ───────────────> Local MinIO (Dev)
+          │                                                - Endpoint: localhost:9000
+          │                                                - forcePathStyle: true
+[StorageService]
+          │
+          └───────────── USE_MINIO=false ──────────────> Production AWS S3
+                                                           - Endpoint: s3.amazonaws.com
+                                                           - IAM Role or Env credentials
+```
+
+*   **MinIO (Local Dev)**: Leveraged to replicate full cloud behaviors on developers' local machines. When `USE_MINIO=true`, the service routes payloads directly to local ports using path-style routing (`forcePathStyle: true`).
+*   **AWS S3 (Production)**: When `USE_MINIO=false`, the client drops local path overrides and routes uploads securely to global AWS S3 buckets using standard sub-domain endpoints. It resolves IAM roles or env configurations automatically.
+*   **URL Generation**: The system dynamically handles URL rendering. While inside the backend, files are resolved via local Docker bridge endpoints, `StorageService.getFileUrl()` generates clean external browser URLs (e.g., swapping `minio:9000` with `localhost:9000`) so administrative browsers can load documents natively.
 
 ---
 
@@ -659,6 +777,303 @@ All REST endpoint requests and responses are structured in JSON format. The base
       "id": 12,
       "name": "Acme Urban Construction",
       "message": "Project deleted successfully"
+    }
+    ```
+
+---
+
+#### ➔ `POST /project/:id/work-order`
+*   **Description**: Uploads a work order PDF file using S3/MinIO. If an old PDF exists, it is permanently deleted from the object storage to optimize space.
+*   **Headers**: `Content-Type: multipart/form-data`
+*   **Path Parameters**:
+    *   `id`: Integer ID of the target project
+*   **Request Body**:
+    *   `file`: Binary PDF file attachment (Multipart form-data)
+*   **Success Response** (`201 Created`):
+    ```json
+    {
+      "id": 12,
+      "name": "Acme Construction Site",
+      "description": "Dynamic infrastructure project",
+      "status": "active",
+      "createdBy": 1,
+      "workOrderPdf": "work-orders/d290f1ee-6c54-4b01-90e6-d701748f0851.pdf",
+      "workOrderUrl": "http://localhost:9000/rooeel/work-orders/d290f1ee-6c54-4b01-90e6-d701748f0851.pdf"
+    }
+    ```
+
+---
+
+#### ➔ `DELETE /project/:id/work-order`
+*   **Description**: Deletes a project's work order PDF from storage and clears the reference column in the PostgreSQL database.
+*   **Path Parameters**:
+    *   `id`: Integer ID of the target project
+*   **Success Response** (`200 OK`):
+    ```json
+    {
+      "success": true
+    }
+    ```
+
+---
+
+#### ➔ `GET /project/:id/fields`
+*   **Description**: Retrieves all dynamic custom fields and metadata defined for the project, sorted by display orders. Includes current values.
+*   **Path Parameters**:
+    *   `id`: Integer ID of the target project
+*   **Success Response** (`200 OK`):
+    ```json
+    [
+      {
+        "id": 1,
+        "projectId": 12,
+        "name": "siteAddress",
+        "label": "Site Address",
+        "fieldType": "text",
+        "options": null,
+        "required": true,
+        "sortOrder": 1,
+        "createdAt": "2026-05-18T12:00:00.000Z",
+        "value": {
+          "id": 1,
+          "fieldId": 1,
+          "projectId": 12,
+          "value": "123 Main St, New York, NY",
+          "createdAt": "2026-05-18T12:00:00.000Z",
+          "updatedAt": "2026-05-18T12:05:00.000Z"
+        }
+      }
+    ]
+    ```
+
+---
+
+#### ➔ `POST /project/:id/fields`
+*   **Description**: Appends a new custom dynamic field structure to the project.
+*   **Path Parameters**:
+    *   `id`: Integer ID of the target project
+*   **Request Body**:
+    ```json
+    {
+      "name": "siteAddress",
+      "label": "Site Address",
+      "fieldType": "text",      // Choices: 'text', 'number', 'date', 'select', 'textarea', 'file'
+      "required": true,
+      "sortOrder": 1,
+      "options": null           // Array of options, e.g. [{"value": "opt1", "label": "Option 1"}]
+    }
+    ```
+*   **Success Response** (`201 Created`):
+    ```json
+    {
+      "id": 1,
+      "projectId": 12,
+      "name": "siteAddress",
+      "label": "Site Address",
+      "fieldType": "text",
+      "options": null,
+      "required": true,
+      "sortOrder": 1,
+      "createdAt": "2026-05-18T12:00:00.000Z"
+    }
+    ```
+
+---
+
+#### ➔ `DELETE /project/:id/fields/:fieldId`
+*   **Description**: Deletes a dynamic field from the project layout. Cascades to automatically delete the field value.
+*   **Path Parameters**:
+    *   `id`: Integer ID of the target project
+    *   `fieldId`: Integer ID of the dynamic field to delete
+*   **Success Response** (`200 OK`):
+    ```json
+    {
+      "id": 1,
+      "projectId": 12,
+      "name": "siteAddress"
+    }
+    ```
+
+---
+
+#### ➔ `POST /project/:id/fields/:fieldId/value`
+*   **Description**: Saves or modifies the input value for a dynamic project field. Resolves as an upsert transaction.
+*   **Path Parameters**:
+    *   `id`: Integer ID of the target project
+    *   `fieldId`: Integer ID of the dynamic field
+*   **Request Body**:
+    ```json
+    {
+      "value": "123 Main St, New York, NY"
+    }
+    ```
+*   **Success Response** (`201 Created`):
+    ```json
+    {
+      "id": 1,
+      "fieldId": 1,
+      "projectId": 12,
+      "value": "123 Main St, New York, NY",
+      "createdAt": "2026-05-18T12:00:00.000Z",
+      "updatedAt": "2026-05-18T12:05:00.000Z"
+    }
+    ```
+
+---
+
+#### ➔ `GET /project/:id/users`
+*   **Description**: Retrieves a list of all user memberships and roles assigned within this specific project.
+*   **Path Parameters**:
+    *   `id`: Integer ID of the target project
+*   **Success Response** (`200 OK`):
+    ```json
+    [
+      {
+        "id": 5,
+        "projectId": 12,
+        "userId": 4,
+        "role": "manager",
+        "assignedAt": "2026-05-18T12:00:00.000Z",
+        "user": {
+          "id": 4,
+          "firstName": "Mark",
+          "lastName": "Spencer",
+          "email": "mark@spencer.com"
+        }
+      }
+    ]
+    ```
+
+---
+
+#### ➔ `POST /project/:id/users`
+*   **Description**: Assigns a user to the project with a custom role.
+*   **Path Parameters**:
+    *   `id`: Integer ID of the target project
+*   **Request Body**:
+    ```json
+    {
+      "userId": 4,
+      "role": "manager" // Optional, defaults to "member"
+    }
+    ```
+*   **Success Response** (`201 Created`):
+    ```json
+    {
+      "id": 5,
+      "projectId": 12,
+      "userId": 4,
+      "role": "manager",
+      "assignedAt": "2026-05-18T12:00:00.000Z",
+      "user": {
+        "id": 4,
+        "firstName": "Mark",
+        "lastName": "Spencer",
+        "email": "mark@spencer.com"
+      }
+    }
+    ```
+
+---
+
+#### ➔ `DELETE /project/:id/users/:userId`
+*   **Description**: Unassigns a user from the project, revoking their project memberships.
+*   **Path Parameters**:
+    *   `id`: Integer ID of the target project
+    *   `userId`: Integer ID of the user to unassign
+*   **Success Response** (`200 OK`):
+    ```json
+    {
+      "id": 5,
+      "projectId": 12,
+      "userId": 4,
+      "role": "manager"
+    }
+    ```
+
+---
+
+#### ➔ `GET /project/:id/tasks`
+*   **Description**: Lists all basic or form-based tasks defined within the project, including assignee profile details.
+*   **Path Parameters**:
+    *   `id`: Integer ID of the target project
+*   **Success Response** (`200 OK`):
+    ```json
+    [
+      {
+        "id": 1,
+        "title": "Excavate Foundation",
+        "description": "Prepare excavation and frame boundary",
+        "status": "pending",
+        "type": "basic",
+        "formSchema": null,
+        "submissionData": null,
+        "projectId": 12,
+        "assignedTo": 4,
+        "createdAt": "2026-05-18T12:00:00.000Z",
+        "updatedAt": "2026-05-18T12:00:00.000Z",
+        "assignee": {
+          "id": 4,
+          "firstName": "Mark",
+          "lastName": "Spencer",
+          "email": "mark@spencer.com"
+        }
+      }
+    ]
+    ```
+
+---
+
+#### ➔ `POST /project/:id/tasks`
+*   **Description**: Creates a new task in the project (can support basic text descriptions or customized dynamic form schemas).
+*   **Path Parameters**:
+    *   `id`: Integer ID of the target project
+*   **Request Body**:
+    ```json
+    {
+      "title": "Excavate Foundation",
+      "description": "Prepare excavation and frame boundary",
+      "status": "pending",        // Choices: 'pending', 'accepted', 'in-progress', 'done'
+      "type": "basic",            // Choices: 'basic', 'form'
+      "formSchema": null,         // Optional JSON schema for structured form submissions
+      "assignedTo": 4             // Optional Integer userId of assignee
+    }
+    ```
+*   **Success Response** (`201 Created`):
+    ```json
+    {
+      "id": 1,
+      "title": "Excavate Foundation",
+      "description": "Prepare excavation and frame boundary",
+      "status": "pending",
+      "type": "basic",
+      "formSchema": null,
+      "submissionData": null,
+      "projectId": 12,
+      "assignedTo": 4,
+      "createdAt": "2026-05-18T12:00:00.000Z",
+      "updatedAt": "2026-05-18T12:00:00.000Z",
+      "assignee": {
+        "id": 4,
+        "firstName": "Mark",
+        "lastName": "Spencer",
+        "email": "mark@spencer.com"
+      }
+    }
+    ```
+
+---
+
+#### ➔ `DELETE /project/:id/tasks/:taskId`
+*   **Description**: Deletes a specific task.
+*   **Path Parameters**:
+    *   `id`: Integer ID of the target project
+    *   `taskId`: Integer ID of the task to delete
+*   **Success Response** (`200 OK`):
+    ```json
+    {
+      "id": 1,
+      "title": "Excavate Foundation"
     }
     ```
 

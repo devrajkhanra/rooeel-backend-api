@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, ParseIntPipe, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ProjectService } from './services/project.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
+import { FileInterceptor } from '@nestjs/platform-express'
 
 @UseGuards(JwtAuthGuard, AdminGuard) // Locks the entire controller down to Admins only
 @Controller('project')
@@ -35,6 +36,20 @@ export class ProjectController {
     @Delete(':id')
     remove(@Param('id', ParseIntPipe) id: number) {
         return this.projectService.remove(id);
+    }
+
+    @Post(':id/work-order')
+    @UseInterceptors(FileInterceptor('file'))
+    async uploadWorkOrder(
+        @Param('id') projectId: string,
+        @UploadedFile() file: Express.Multer.File,
+    ) {
+        return this.projectService.uploadWorkOrder(Number(projectId), file);
+    }
+
+    @Delete(':id/work-order')
+    async deleteWorkOrder(@Param('id') projectId: string) {
+        return this.projectService.deleteWorkOrder(Number(projectId));
     }
 
     // --- DYNAMIC FIELDS ---

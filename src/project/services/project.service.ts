@@ -2,10 +2,11 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProjectDto } from '../dto/create-project.dto';
 import { UpdateProjectDto } from '../dto/update-project.dto';
+import { StorageService } from 'src/storage/storage.service';
 
 @Injectable()
 export class ProjectService {
-    constructor(private prisma: PrismaService) { }
+    constructor(private prisma: PrismaService, private storage: StorageService) { }
 
     async create(adminId: number, createProjectDto: CreateProjectDto) {
         return this.prisma.project.create({
@@ -67,6 +68,46 @@ export class ProjectService {
         return this.prisma.project.delete({
             where: { id },
         });
+    }
+
+    async uploadWorkOrder(projectId: number, file: Express.Multer.File) {
+        const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+        if (!project) throw new NotFoundException('Project not found');
+
+        // If an old PDF exists, delete it from S3/MinIO to save space
+        if (project.workOrderPdf) {
+            await this.storage.deleteFile(project.workOrderPdf);
+        }
+
+        // Upload new file
+        const fileKey = await this.storage.uploadFile(file);
+
+        // Update DB
+        const updatedProject = await this.prisma.project.update({
+            where: { id: projectId },
+            data: { workOrderPdf: fileKey },
+        });
+
+        return {
+            ...updatedProject,
+            workOrderUrl: this.storage.getFileUrl(fileKey),
+        };
+    }
+
+    async deleteWorkOrder(projectId: number) {
+        const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+        if (!project || !project.workOrderPdf) return { success: true };
+
+        // Delete from S3/MinIO
+        await this.storage.deleteFile(project.workOrderPdf);
+
+        // Update DB
+        await this.prisma.project.update({
+            where: { id: projectId },
+            data: { workOrderPdf: null },
+        });
+
+        return { success: true };
     }
 
     // --- DYNAMIC FIELDS ---
