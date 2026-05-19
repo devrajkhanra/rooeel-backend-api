@@ -3,7 +3,7 @@ import { ProjectService } from './services/project.service';
 import { CreateProjectDto } from './dto/create-project.input';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AdminGuard } from '../auth/guards/admin.guard';
+import { AdminGuard } from '../auth/guards/gql-admin.guard';
 import { FileInterceptor } from '@nestjs/platform-express'
 
 @UseGuards(JwtAuthGuard, AdminGuard) // Locks the entire controller down to Admins only

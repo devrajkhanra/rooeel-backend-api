@@ -1,7 +1,7 @@
 // user.interface.ts
 import { User } from '@prisma/client';
-import { CreateUserDto } from '../dto/create-user.dto';
-import { UpdateUserDto } from '../dto/update-user.dto';
+import { CreateUserDto } from '../dto/create-user.input';
+import { UpdateUserDto } from '../dto/update-user.input';
 
 export interface IUserService {
     create(createUserDto: CreateUserDto, adminId: number): Promise<User>;

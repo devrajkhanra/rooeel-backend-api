@@ -14,8 +14,8 @@ import {
 import { RequestService } from './services/request.service';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { UserGuard } from '../auth/guards/user.guard';
-import { AdminGuard } from '../auth/guards/admin.guard';
+import { UserGuard } from '../auth/guards/gql-user.guard';
+import { AdminGuard } from '../auth/guards/gql-admin.guard';
 
 @Controller('request')
 export class RequestController {

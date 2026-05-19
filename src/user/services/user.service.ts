@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateUserDto } from '../dto/create-user.dto';
-import { UpdateUserDto } from '../dto/update-user.dto';
+import { CreateUserDto } from '../dto/create-user.input';
+import { UpdateUserDto } from '../dto/update-user.input';
 import { IUserService } from '../interfaces/user.interface';
 import { PasswordService } from '../../common/services/password.service';
 import { EmailService } from '../../common/services/email.service';
