@@ -20,7 +20,10 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
-    "dev": "npm run infra:up && npx prisma generate && nest start --watch"
+    "infra:reset-db": "docker compose down -v && docker compose up -d",
+    "dev": "npm run infra:up && npx prisma generate && npm run start:dev",
+    "docker:dev:up": "docker compose down && docker compose -f infrastructure/docker/docker-compose.yml up -d --build",
+    "docker:dev:down": "docker compose -f infrastructure/docker/docker-compose.yml down"
   },
   "dependencies": {
     "@apollo/server": "^5.5.1",

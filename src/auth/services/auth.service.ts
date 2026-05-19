@@ -55,8 +55,8 @@ export class AuthService implements IAuthService {
             }
         );
 
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 7);
+        const refreshExpiry = this.configService.get('JWT_REFRESH_EXPIRY') || '7d';
+        const expiresAt = new Date(Date.now() + this.parseExpiry(refreshExpiry) * 1000);
 
         const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
         await this.prisma.refreshToken.create({
@@ -69,7 +69,6 @@ export class AuthService implements IAuthService {
         });
 
         const accessExpiry = this.configService.get('JWT_ACCESS_EXPIRY') || '15m';
-        const refreshExpiry = this.configService.get('JWT_REFRESH_EXPIRY') || '7d';
 
         return {
             accessToken,
@@ -148,8 +147,7 @@ export class AuthService implements IAuthService {
                     const ttl = Math.max(0, Math.floor((exp - Date.now()) / 1000));
 
                     if (ttl > 0) {
-                        // The cache instruction must go INSIDE this block with ttl
-                        await this.cacheManager.set(`bl_${accessToken}`, true, ttl * 1000);
+                        await this.cacheManager.set(`blacklist:${user.jti}`, true, ttl * 1000);
                     }
                 }
             }

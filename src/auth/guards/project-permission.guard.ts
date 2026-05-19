@@ -10,7 +10,7 @@ import { GqlExecutionContext } from '@nestjs/graphql';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PERMISSION_CHECK_KEY, PermissionMetadata } from '../decorators/check-permission.decorator';
 import { JwtService } from '@nestjs/jwt';
-import { jwtConstants } from '../strategies/jwt.strategy';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class ProjectPermissionGuard implements CanActivate {
@@ -18,6 +18,7 @@ export class ProjectPermissionGuard implements CanActivate {
         private readonly reflector: Reflector,
         private readonly prisma: PrismaService,
         private readonly jwtService: JwtService,
+        private readonly configService: ConfigService,
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -34,7 +35,7 @@ export class ProjectPermissionGuard implements CanActivate {
         let payload: any;
         try {
             payload = this.jwtService.verify(token, {
-                secret: process.env.JWT_SECRET || jwtConstants.secret,
+                secret: this.configService.get('JWT_SECRET'),
             });
         } catch (err) {
             throw new UnauthorizedException('Invalid token');

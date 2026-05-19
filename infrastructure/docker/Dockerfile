@@ -1,6 +1,7 @@
 # ─── Stage 1: Base dependencies ──────────────────────────────────────────────
 FROM node:20-alpine AS deps
 WORKDIR /app
+RUN apk add --no-cache openssl
 
 COPY package*.json ./
 RUN npm ci --frozen-lockfile
@@ -8,6 +9,7 @@ RUN npm ci --frozen-lockfile
 # ─── Stage 2: Development (hot-reload with ts-node / nest start:dev) ─────────
 FROM node:20-alpine AS development
 WORKDIR /app
+RUN apk add --no-cache openssl
 
 # Copy all deps (including devDependencies needed for ts compilation)
 COPY --from=deps /app/node_modules ./node_modules
@@ -21,6 +23,7 @@ CMD ["npm", "run", "start:dev"]
 # ─── Stage 3: Builder (compile TypeScript to dist/) ──────────────────────────
 FROM node:20-alpine AS builder
 WORKDIR /app
+RUN apk add --no-cache openssl
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -33,6 +36,7 @@ RUN npm run build
 # ─── Stage 4: Production (lean, no devDeps, no src/) ─────────────────────────
 FROM node:20-alpine AS production
 WORKDIR /app
+RUN apk add --no-cache openssl
 
 ENV NODE_ENV=production
 

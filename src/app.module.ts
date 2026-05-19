@@ -16,11 +16,12 @@ import { ProjectModule } from './project/project.module';
 import { RequestModule } from './request/request.module';
 import { AppResolver } from './app.resolver';
 import { StorageModule } from './storage/storage.module';
+import { validateEnv } from './config/env.validation';
 
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     // Configure Redis Cache globally
     CacheModule.registerAsync({
       isGlobal: true,

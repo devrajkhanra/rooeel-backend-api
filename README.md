@@ -288,7 +288,7 @@ FRONTEND_URL=http://localhost:3000
 
 # ── S3 Storage Configuration (MinIO / AWS S3) ───────────────
 MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=minioadmin123
+MINIO_ROOT_PASSWORD=minioadmin
 MINIO_ENDPOINT=localhost:9000    # Use "minio:9000" inside Docker networks
 MINIO_BUCKET=rooeel              # Destination S3 bucket name
 USE_MINIO=true                   # Set to false to divert assets to AWS S3 in production
@@ -319,11 +319,46 @@ npm run start:dev
 
 *   **PostgreSQL**: `localhost:5432`
 *   **Redis**: `localhost:6379`
-*   **MinIO Console**: `http://localhost:9001` (Creds: `minioadmin` / `minioadmin123`)
+*   **MinIO Console**: `http://localhost:9001` (Creds: `minioadmin` / `minioadmin`)
 
 ---
 
-### 2. Multi-Stage Production Setup (Complete Build Isolation)
+### 2. Full Dockerized Development API (Optional)
+Use this when you want NestJS itself to run inside Docker (hot-reload container flow). This mode is mutually exclusive with the root infra stack because container names are shared:
+
+```bash
+npm run docker:dev:up
+```
+
+In this mode, the API container uses `DATABASE_URL=postgresql://rooeel:rooeel_pass@postgres:5432/rooeel_db` (Docker network host `postgres`).
+
+Stop it with:
+
+```bash
+npm run docker:dev:down
+```
+
+### 3. One-Time Local DB Reset (Fixes Prisma `P1000` After Credential Changes)
+Postgres credentials are only applied when the data volume is first initialized. If credentials were changed later, reset local Postgres volume once:
+
+```bash
+# WARNING: deletes local Postgres data
+npm run infra:down
+docker volume rm rooeel-backend-api_postgres_data
+npm run infra:up
+npx prisma generate
+npx prisma db pull
+```
+
+### 4. Troubleshooting: Prisma `P1000` Authentication Failed
+If you see `PrismaClientInitializationError` with `P1000`:
+
+1. Confirm `.env` uses `DATABASE_URL="postgresql://rooeel:rooeel_pass@localhost:5432/rooeel_db?schema=public"` for host-run Nest.
+2. Confirm local infra uses `POSTGRES_USER=rooeel` and `POSTGRES_PASSWORD=rooeel_pass`.
+3. If DB was initialized before credential alignment, run the one-time reset sequence above.
+4. Validate connectivity before app boot: `npx prisma db pull`.
+
+### 5. Multi-Stage Production Setup (Complete Build Isolation)
 For production deployments, the backend is orchestrated via a high-performance **multi-stage docker build** which strips development packages and runs as a lean, unprivileged container:
 
 ```bash
@@ -651,3 +686,4 @@ npm run test:cov
 ## ⚖️ License
 
 Rooeel is licensed under the terms of the private/proprietary license (UNLICENSED). All rights reserved.
+

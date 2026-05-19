@@ -5,6 +5,7 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
   // 1. Set a global prefix for all routes (e.g., http://localhost:3000/api/v1)
   app.setGlobalPrefix('api/v1');
@@ -14,8 +15,12 @@ async function bootstrap() {
     contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
   }));
 
+  const allowedOrigins = (process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
   app.enableCors({
-    origin: 'http://localhost:5173',
+    origin: allowedOrigins,
     credentials: true,
   });
 

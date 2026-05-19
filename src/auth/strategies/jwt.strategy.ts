@@ -7,7 +7,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 
 export const jwtConstants = {
-    secret: 'secretKey',
+    secret: '',
 };
 
 @Injectable()
@@ -19,7 +19,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         super({
             jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
-            secretOrKey: configService.get('JWT_SECRET') || jwtConstants.secret,
+            secretOrKey: configService.get<string>('JWT_SECRET') || jwtConstants.secret,
         });
     }
 

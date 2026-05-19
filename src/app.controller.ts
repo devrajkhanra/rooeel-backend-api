@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common';
 import { AppService } from './app.service';
 
 @Controller()
@@ -8,5 +8,17 @@ export class AppController {
   @Get()
   getHello(): string {
     return this.appService.getHello();
+  }
+
+  @Get('health/live')
+  @HttpCode(HttpStatus.OK)
+  getLiveness() {
+    return this.appService.getLiveness();
+  }
+
+  @Get('health/ready')
+  async getReadiness() {
+    const readiness = await this.appService.getReadiness();
+    return readiness;
   }
 }

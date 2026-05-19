@@ -13,6 +13,22 @@ import { Request, Response } from 'express';
 export class AuthResolver {
     constructor(private readonly authService: AuthService) { }
 
+    private getRefreshCookieOptions() {
+        return {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax' as const,
+            path: '/',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+        };
+    }
+
+    private extractRefreshTokenFromCookies(cookieHeader?: string): string | null {
+        if (!cookieHeader) return null;
+        const match = cookieHeader.match(/(?:^|;\s*)refreshToken=([^;]+)/);
+        return match?.[1] ?? null;
+    }
+
     @Mutation(() => AuthResponse, { name: 'signup' })
     async signup(
         @Args('signupInput') signupInput: SignupInput,
@@ -21,12 +37,7 @@ export class AuthResolver {
         const response = await this.authService.signup(signupInput);
 
         // Set HTTP-only cookie
-        context.res.cookie('refreshToken', response.refresh_token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        });
+        context.res.cookie('refreshToken', response.refresh_token, this.getRefreshCookieOptions());
 
         return {
             access_token: response.access_token,
@@ -42,12 +53,7 @@ export class AuthResolver {
     ) {
         const response = await this.authService.login(loginInput);
 
-        context.res.cookie('refreshToken', response.refresh_token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-        });
+        context.res.cookie('refreshToken', response.refresh_token, this.getRefreshCookieOptions());
 
         return {
             access_token: response.access_token,
@@ -62,7 +68,7 @@ export class AuthResolver {
         @Context() context: { req: Request; res: Response },
     ) {
         // Extract token from cookie string manually or via cookie-parser
-        const refreshToken = context.req.headers.cookie?.split('refreshToken=')[1]?.split(';')[0];
+        const refreshToken = this.extractRefreshTokenFromCookies(context.req.headers.cookie);
 
         if (!refreshToken) {
             throw new UnauthorizedException('Refresh token not found');
@@ -70,12 +76,7 @@ export class AuthResolver {
 
         const tokens = await this.authService.refreshTokens(refreshToken);
 
-        context.res.cookie('refreshToken', tokens.refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-        });
+        context.res.cookie('refreshToken', tokens.refreshToken, this.getRefreshCookieOptions());
 
         return {
             access_token: tokens.accessToken,
@@ -94,7 +95,10 @@ export class AuthResolver {
         await this.authService.logout(accessToken, user);
 
         // Clear the cookie
-        context.res.clearCookie('refreshToken');
+        context.res.clearCookie('refreshToken', {
+            ...this.getRefreshCookieOptions(),
+            maxAge: undefined,
+        });
 
         return { message: 'Logout successful' };
     }
