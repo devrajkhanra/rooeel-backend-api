@@ -194,8 +194,22 @@ model Department {
   users       ProjectUser[]
   tasks       Task[]
   permissions Permission[]
+  dynamicRoles DepartmentRole[]
 
   @@index([projectId])
+}
+
+model DepartmentRole {
+  id           Int        @id @default(autoincrement())
+  departmentId Int
+  name         String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([departmentId, name])
+  @@index([departmentId])
 }
 
 // ─────────────────────────────────────────────────────────────

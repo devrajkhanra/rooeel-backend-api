@@ -7,6 +7,7 @@ import { ProjectUser } from './models/project-user.model';
 import { WorkOrderPdf } from './models/work-order-pdf.model';
 import { ProjectRole } from './models/project-role.model';
 import { Department } from './models/department.model';
+import { DepartmentRole } from './models/department-role.model';
 import { Permission } from './models/permission.model';
 import { Task } from './models/task.model';
 import { SubTask } from './models/subtask.model';
@@ -293,6 +294,15 @@ export class ProjectResolver {
     }
 
     @UseGuards(GqlAdminGuard)
+    @Mutation(() => ProjectRole, { name: 'updateProjectRole' })
+    updateRole(
+        @Args('id', { type: () => Int }) id: number,
+        @Args('name') name: string,
+    ) {
+        return this.projectService.updateRole(id, name);
+    }
+
+    @UseGuards(GqlAdminGuard)
     @Mutation(() => Boolean, { name: 'removeProjectRole' })
     removeRole(@Args('id', { type: () => Int }) id: number) {
         return this.projectService.removeRole(id);
@@ -377,6 +387,36 @@ export class ProjectResolver {
         @Args('userId', { type: () => Int }) userId: number,
     ) {
         return this.projectService.removeUserFromDepartment(projectId, userId);
+    }
+
+    @UseGuards(GqlAdminGuard)
+    @Query(() => [DepartmentRole], { name: 'departmentRoles' })
+    getDepartmentRoles(@Args('departmentId', { type: () => Int }) departmentId: number) {
+        return this.projectService.getDepartmentRoles(departmentId);
+    }
+
+    @UseGuards(GqlAdminGuard)
+    @Mutation(() => DepartmentRole, { name: 'createDepartmentRole' })
+    createDepartmentRole(
+        @Args('departmentId', { type: () => Int }) departmentId: number,
+        @Args('name') name: string,
+    ) {
+        return this.projectService.createDepartmentRole(departmentId, name);
+    }
+
+    @UseGuards(GqlAdminGuard)
+    @Mutation(() => DepartmentRole, { name: 'updateDepartmentRole' })
+    updateDepartmentRole(
+        @Args('id', { type: () => Int }) id: number,
+        @Args('name') name: string,
+    ) {
+        return this.projectService.updateDepartmentRole(id, name);
+    }
+
+    @UseGuards(GqlAdminGuard)
+    @Mutation(() => Boolean, { name: 'removeDepartmentRole' })
+    removeDepartmentRole(@Args('id', { type: () => Int }) id: number) {
+        return this.projectService.removeDepartmentRole(id);
     }
 
     // ── PERMISSIONS ───────────────────────────────────────────

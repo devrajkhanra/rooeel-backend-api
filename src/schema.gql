@@ -82,6 +82,14 @@ type Department {
   updatedAt: DateTime!
 }
 
+type DepartmentRole {
+  createdAt: DateTime!
+  departmentId: Int!
+  id: Int!
+  name: String!
+  updatedAt: DateTime!
+}
+
 input LoginInput {
   email: String!
   password: String!
@@ -107,6 +115,7 @@ type Mutation {
   changeUserRole(newRoleId: Int!, projectId: Int!, userId: Int!): ProjectUser!
   createAdmin(createAdminInput: CreateAdminInput!): Admin!
   createDepartment(name: String!, projectId: Int!): Department!
+  createDepartmentRole(departmentId: Int!, name: String!): DepartmentRole!
   createProject(createProjectInput: CreateProjectInput!): Project!
   createProjectRole(name: String!, projectId: Int!): ProjectRole!
   createSubTask(input: CreateSubTaskInput!, taskId: Int!): SubTask!
@@ -119,6 +128,7 @@ type Mutation {
   refreshToken: AuthResponse!
   removeAdmin(id: Int!): Admin!
   removeDepartment(id: Int!): Boolean!
+  removeDepartmentRole(id: Int!): Boolean!
   removePermission(id: Int!): Boolean!
   removeProject(id: Int!): Project!
   removeProjectField(fieldId: Int!): Boolean!
@@ -136,7 +146,9 @@ type Mutation {
   unsetUserRole(projectId: Int!, userId: Int!): ProjectUser!
   updateAdmin(id: Int!, updateAdminInput: UpdateAdminInput!): Admin!
   updateDepartment(id: Int!, name: String!): Department!
+  updateDepartmentRole(id: Int!, name: String!): DepartmentRole!
   updateMyProfile(updateUserInput: UpdateUserInput!): User!
+  updateProjectRole(id: Int!, name: String!): ProjectRole!
   updateProject(id: Int!, updateProjectInput: UpdateProjectInput!): Project!
   updateSubTask(id: Int!, input: UpdateTaskInput!): SubTask!
   updateTask(id: Int!, input: UpdateTaskInput!): Task!
@@ -209,6 +221,7 @@ type Query {
   admin(id: Int!): Admin
   admins: [Admin!]!
   departments(projectId: Int!): [Department!]!
+  departmentRoles(departmentId: Int!): [DepartmentRole!]!
 
   """Basic health check for the GraphQL API"""
   healthCheck: String!

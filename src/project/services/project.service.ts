@@ -218,7 +218,50 @@ export class ProjectService {
     }
 
     async createRole(projectId: number, name: string) {
-        return this.prisma.projectRole.create({ data: { projectId, name } });
+        await this.findOne(projectId);
+        const normalizedName = name.trim();
+        if (!normalizedName) {
+            throw new ConflictException('Role name is required');
+        }
+
+        const existing = await this.prisma.projectRole.findFirst({
+            where: { projectId, name: normalizedName },
+            select: { id: true },
+        });
+        if (existing) {
+            throw new ConflictException(`Role "${normalizedName}" already exists in this project`);
+        }
+
+        return this.prisma.projectRole.create({ data: { projectId, name: normalizedName } });
+    }
+
+    async updateRole(id: number, name: string) {
+        const role = await this.prisma.projectRole.findUniqueOrThrow({
+            where: { id },
+            select: { id: true, projectId: true, name: true },
+        });
+
+        const normalizedName = name.trim();
+        if (!normalizedName) {
+            throw new ConflictException('Role name is required');
+        }
+
+        const duplicate = await this.prisma.projectRole.findFirst({
+            where: {
+                projectId: role.projectId,
+                name: normalizedName,
+                id: { not: id },
+            },
+            select: { id: true },
+        });
+        if (duplicate) {
+            throw new ConflictException(`Role "${normalizedName}" already exists in this project`);
+        }
+
+        return this.prisma.projectRole.update({
+            where: { id },
+            data: { name: normalizedName },
+        });
     }
 
     async removeRole(id: number) {
@@ -270,6 +313,51 @@ export class ProjectService {
     async removeDepartment(id: number) {
         await this.prisma.department.findUniqueOrThrow({ where: { id } });
         await this.prisma.department.delete({ where: { id } });
+        return true;
+    }
+
+    async getDepartmentRoles(departmentId: number) {
+        await this.prisma.department.findUniqueOrThrow({ where: { id: departmentId } });
+        return this.prisma.departmentRole.findMany({
+            where: { departmentId },
+            orderBy: { name: 'asc' },
+        });
+    }
+
+    async createDepartmentRole(departmentId: number, name: string) {
+        await this.prisma.department.findUniqueOrThrow({ where: { id: departmentId } });
+        const normalizedName = name.trim();
+        if (!normalizedName) throw new ConflictException('Role name is required');
+        return this.prisma.departmentRole.create({
+            data: { departmentId, name: normalizedName },
+        });
+    }
+
+    async updateDepartmentRole(id: number, name: string) {
+        const role = await this.prisma.departmentRole.findUniqueOrThrow({
+            where: { id },
+            select: { id: true, departmentId: true },
+        });
+        const normalizedName = name.trim();
+        if (!normalizedName) throw new ConflictException('Role name is required');
+        const duplicate = await this.prisma.departmentRole.findFirst({
+            where: {
+                departmentId: role.departmentId,
+                name: normalizedName,
+                id: { not: id },
+            },
+            select: { id: true },
+        });
+        if (duplicate) throw new ConflictException(`Role "${normalizedName}" already exists in this department`);
+        return this.prisma.departmentRole.update({
+            where: { id },
+            data: { name: normalizedName },
+        });
+    }
+
+    async removeDepartmentRole(id: number) {
+        await this.prisma.departmentRole.findUniqueOrThrow({ where: { id } });
+        await this.prisma.departmentRole.delete({ where: { id } });
         return true;
     }
 

@@ -29,12 +29,25 @@ export class EmailService {
             : this.buildTemporaryPasswordEmail(firstName, temporaryPasswordOrLink);
 
         try {
-            await this.resend.emails.send({
+            const response = await this.resend.emails.send({
                 from: `${fromName} <${fromEmail}>`,
                 to: toEmail,
                 subject,
                 html: htmlContent,
             });
+
+            // Resend SDK can return { data, error } without throwing.
+            // Treat provider-level errors as hard failures so we never log false "sent" success.
+            const providerError = (response as any)?.error;
+            if (providerError) {
+                const errorMessage =
+                    providerError?.message ||
+                    providerError?.name ||
+                    'Unknown email provider error';
+                this.logger.error(`Failed to send email to ${toEmail}: ${errorMessage}`, providerError);
+                throw new Error(errorMessage);
+            }
+
             this.logger.log(`Password reset email sent to ${toEmail}`);
         } catch (error) {
             this.logger.error(`Failed to send email to ${toEmail}`, error);
