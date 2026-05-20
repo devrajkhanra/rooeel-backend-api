@@ -8,6 +8,7 @@ import { WorkOrderPdf } from './models/work-order-pdf.model';
 import { ProjectRole } from './models/project-role.model';
 import { Department } from './models/department.model';
 import { DepartmentRole } from './models/department-role.model';
+import { DepartmentRolePolicy } from './models/department-role-policy.model';
 import { Permission } from './models/permission.model';
 import { Task } from './models/task.model';
 import { SubTask } from './models/subtask.model';
@@ -143,6 +144,33 @@ class SetPermissionInput {
     canDelete: boolean;
 }
 
+@InputType()
+class SetDepartmentRolePolicyInput {
+    @Field(() => Int)
+    @IsInt()
+    roleId: number;
+
+    @Field()
+    @IsString()
+    resource: string;
+
+    @Field()
+    @IsBoolean()
+    canView: boolean;
+
+    @Field()
+    @IsBoolean()
+    canCreate: boolean;
+
+    @Field()
+    @IsBoolean()
+    canEdit: boolean;
+
+    @Field()
+    @IsBoolean()
+    canDelete: boolean;
+}
+
 // ─── SCALAR RESPONSE ─────────────────────────────────────────
 
 @ObjectType()
@@ -182,8 +210,11 @@ export class ProjectResolver {
 
     @UseGuards(GqlUserGuard) // Both admin and user can see project details
     @Query(() => Project, { name: 'project' })
-    findOne(@Args('id', { type: () => Int }) id: number) {
-        return this.projectService.findOne(id);
+    findOne(
+        @Args('id', { type: () => Int }) id: number,
+        @CurrentUser() user: any,
+    ) {
+        return this.projectService.findOne(id, user);
     }
 
     @UseGuards(GqlAdminGuard)
@@ -390,6 +421,25 @@ export class ProjectResolver {
     }
 
     @UseGuards(GqlAdminGuard)
+    @Mutation(() => ProjectUser, { name: 'setUserDepartmentRole' })
+    setUserDepartmentRole(
+        @Args('projectId', { type: () => Int }) projectId: number,
+        @Args('userId', { type: () => Int }) userId: number,
+        @Args('departmentRoleId', { type: () => Int }) departmentRoleId: number,
+    ) {
+        return this.projectService.setUserDepartmentRole(projectId, userId, departmentRoleId);
+    }
+
+    @UseGuards(GqlAdminGuard)
+    @Mutation(() => ProjectUser, { name: 'unsetUserDepartmentRole' })
+    unsetUserDepartmentRole(
+        @Args('projectId', { type: () => Int }) projectId: number,
+        @Args('userId', { type: () => Int }) userId: number,
+    ) {
+        return this.projectService.unsetUserDepartmentRole(projectId, userId);
+    }
+
+    @UseGuards(GqlAdminGuard)
     @Query(() => [DepartmentRole], { name: 'departmentRoles' })
     getDepartmentRoles(@Args('departmentId', { type: () => Int }) departmentId: number) {
         return this.projectService.getDepartmentRoles(departmentId);
@@ -417,6 +467,31 @@ export class ProjectResolver {
     @Mutation(() => Boolean, { name: 'removeDepartmentRole' })
     removeDepartmentRole(@Args('id', { type: () => Int }) id: number) {
         return this.projectService.removeDepartmentRole(id);
+    }
+
+    @UseGuards(GqlAdminGuard)
+    @Query(() => [DepartmentRolePolicy], { name: 'departmentRolePolicies' })
+    getDepartmentRolePolicies(@Args('roleId', { type: () => Int }) roleId: number) {
+        return this.projectService.getDepartmentRolePolicies(roleId);
+    }
+
+    @UseGuards(GqlAdminGuard)
+    @Mutation(() => DepartmentRolePolicy, { name: 'setDepartmentRolePolicy' })
+    setDepartmentRolePolicy(@Args('input') input: SetDepartmentRolePolicyInput) {
+        return this.projectService.setDepartmentRolePolicy(
+            input.roleId,
+            input.resource,
+            input.canView,
+            input.canCreate,
+            input.canEdit,
+            input.canDelete,
+        );
+    }
+
+    @UseGuards(GqlAdminGuard)
+    @Mutation(() => Boolean, { name: 'removeDepartmentRolePolicy' })
+    removeDepartmentRolePolicy(@Args('id', { type: () => Int }) id: number) {
+        return this.projectService.removeDepartmentRolePolicy(id);
     }
 
     // ── PERMISSIONS ───────────────────────────────────────────
@@ -454,8 +529,9 @@ export class ProjectResolver {
     getTasks(
         @Args('projectId', { type: () => Int }) projectId: number,
         @Args('departmentId', { type: () => Int, nullable: true }) departmentId?: number,
+        @CurrentUser() user?: any,
     ) {
-        return this.projectService.getTasks(projectId, departmentId);
+        return this.projectService.getTasks(projectId, departmentId, user);
     }
 
     @UseGuards(GqlUserGuard)

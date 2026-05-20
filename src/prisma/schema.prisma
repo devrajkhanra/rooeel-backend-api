@@ -207,9 +207,28 @@ model DepartmentRole {
   updatedAt    DateTime   @updatedAt
 
   department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  policies     DepartmentRolePolicy[]
+  users        ProjectUser[]
 
   @@unique([departmentId, name])
   @@index([departmentId])
+}
+
+model DepartmentRolePolicy {
+  id               Int            @id @default(autoincrement())
+  departmentRoleId Int
+  resource         String
+  canView          Boolean        @default(false)
+  canCreate        Boolean        @default(false)
+  canEdit          Boolean        @default(false)
+  canDelete        Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  departmentRole   DepartmentRole @relation(fields: [departmentRoleId], references: [id], onDelete: Cascade)
+
+  @@unique([departmentRoleId, resource])
+  @@index([departmentRoleId])
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -264,18 +283,21 @@ model ProjectUser {
   userId        Int
   projectRoleId Int?         // FK to ProjectRole (dynamic, nullable)
   departmentId  Int?         // FK to Department (nullable)
+  departmentRoleId Int?      // FK to DepartmentRole (nullable)
   assignedAt    DateTime     @default(now())
 
   project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   projectRole   ProjectRole? @relation(fields: [projectRoleId], references: [id], onDelete: SetNull)
   department    Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  departmentRole DepartmentRole? @relation(fields: [departmentRoleId], references: [id], onDelete: SetNull)
 
   @@unique([projectId, userId])
   @@index([projectId])
   @@index([userId])
   @@index([projectRoleId])
   @@index([departmentId])
+  @@index([departmentRoleId])
 }
 
 // ─────────────────────────────────────────────────────────────

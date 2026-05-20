@@ -123,7 +123,14 @@ export class ProjectPermissionGuard implements CanActivate {
                 projectRole: {
                     include: {
                         permissions: {
-                            where: { resource: metadata.resource },
+                            where: { resource: metadata.resource.toUpperCase() },
+                        },
+                    },
+                },
+                departmentRole: {
+                    include: {
+                        policies: {
+                            where: { resource: metadata.resource.toUpperCase() },
                         },
                     },
                 },
@@ -135,13 +142,12 @@ export class ProjectPermissionGuard implements CanActivate {
         }
 
         const role = (projectUser as any).projectRole;
-        if (!role) {
-            throw new ForbiddenException('No role assigned in this project');
-        }
+        const departmentRole = (projectUser as any).departmentRole;
 
         // Find permission matching resource (and optionally check department scope if applicable)
-        const permission = role.permissions.find(p => p.resource === metadata.resource);
-        if (!permission) {
+        const permission = role?.permissions?.find((p) => p.resource === metadata.resource.toUpperCase());
+        const departmentPolicy = departmentRole?.policies?.find((p) => p.resource === metadata.resource.toUpperCase());
+        if (!permission && !departmentPolicy) {
             throw new ForbiddenException(`No permission defined for ${metadata.resource} on your role`);
         }
 
@@ -149,25 +155,27 @@ export class ProjectPermissionGuard implements CanActivate {
         // "User can see and submit a task/subtask assigned to them or their department only based on permission"
         if (metadata.resource === 'TASK' || metadata.resource === 'SUBTASK') {
             // Check if permission is department-scoped (i.e. permission has departmentId defined)
-            if (permission.departmentId && (projectUser as any).departmentId !== permission.departmentId) {
+            if (permission?.departmentId && (projectUser as any).departmentId !== permission.departmentId) {
                 throw new ForbiddenException('You do not belong to the department required for this operation');
             }
         }
+
+        const departmentPolicyIsAuthoritative = !!departmentPolicy;
 
         // Validate the specific action flag
         let isAllowed = false;
         switch (metadata.action) {
             case 'view':
-                isAllowed = permission.canView;
+                isAllowed = departmentPolicyIsAuthoritative ? !!departmentPolicy?.canView : !!permission?.canView;
                 break;
             case 'create':
-                isAllowed = permission.canCreate;
+                isAllowed = departmentPolicyIsAuthoritative ? !!departmentPolicy?.canCreate : !!permission?.canCreate;
                 break;
             case 'edit':
-                isAllowed = permission.canEdit;
+                isAllowed = departmentPolicyIsAuthoritative ? !!departmentPolicy?.canEdit : !!permission?.canEdit;
                 break;
             case 'delete':
-                isAllowed = permission.canDelete;
+                isAllowed = departmentPolicyIsAuthoritative ? !!departmentPolicy?.canDelete : !!permission?.canDelete;
                 break;
         }
 

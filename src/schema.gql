@@ -90,6 +90,16 @@ type DepartmentRole {
   updatedAt: DateTime!
 }
 
+type DepartmentRolePolicy {
+  canCreate: Boolean!
+  canDelete: Boolean!
+  canEdit: Boolean!
+  canView: Boolean!
+  departmentRoleId: Int!
+  id: Int!
+  resource: String!
+}
+
 input LoginInput {
   email: String!
   password: String!
@@ -129,6 +139,7 @@ type Mutation {
   removeAdmin(id: Int!): Admin!
   removeDepartment(id: Int!): Boolean!
   removeDepartmentRole(id: Int!): Boolean!
+  removeDepartmentRolePolicy(id: Int!): Boolean!
   removePermission(id: Int!): Boolean!
   removeProject(id: Int!): Project!
   removeProjectField(fieldId: Int!): Boolean!
@@ -138,18 +149,21 @@ type Mutation {
   removeUser(id: Int!): User!
   removeUserFromDepartment(projectId: Int!, userId: Int!): ProjectUser!
   resetPassword(newPassword: String!, token: String!): MessageResponse!
+  setDepartmentRolePolicy(input: SetDepartmentRolePolicyInput!): DepartmentRolePolicy!
   setFieldValue(fieldId: Int!, projectId: Int!, value: String!): ProjectFieldValue!
   setPermission(input: SetPermissionInput!): Permission!
+  setUserDepartmentRole(departmentRoleId: Int!, projectId: Int!, userId: Int!): ProjectUser!
   setUserRole(projectId: Int!, roleId: Int!, userId: Int!): ProjectUser!
   signup(signupInput: SignupInput!): AuthResponse!
   unassignUserFromProject(projectId: Int!, userId: Int!): Boolean!
+  unsetUserDepartmentRole(projectId: Int!, userId: Int!): ProjectUser!
   unsetUserRole(projectId: Int!, userId: Int!): ProjectUser!
   updateAdmin(id: Int!, updateAdminInput: UpdateAdminInput!): Admin!
   updateDepartment(id: Int!, name: String!): Department!
   updateDepartmentRole(id: Int!, name: String!): DepartmentRole!
   updateMyProfile(updateUserInput: UpdateUserInput!): User!
-  updateProjectRole(id: Int!, name: String!): ProjectRole!
   updateProject(id: Int!, updateProjectInput: UpdateProjectInput!): Project!
+  updateProjectRole(id: Int!, name: String!): ProjectRole!
   updateSubTask(id: Int!, input: UpdateTaskInput!): SubTask!
   updateTask(id: Int!, input: UpdateTaskInput!): Task!
   updateUser(id: Int!, updateUserInput: UpdateUserInput!): User!
@@ -210,9 +224,13 @@ type ProjectRole {
 type ProjectUser {
   assignedAt: DateTime!
   department: Department
+  departmentId: Int
+  departmentRole: DepartmentRole
+  departmentRoleId: Int
   id: Int!
   projectId: Int!
   projectRole: ProjectRole
+  projectRoleId: Int
   user: User!
   userId: Int!
 }
@@ -220,8 +238,9 @@ type ProjectUser {
 type Query {
   admin(id: Int!): Admin
   admins: [Admin!]!
-  departments(projectId: Int!): [Department!]!
+  departmentRolePolicies(roleId: Int!): [DepartmentRolePolicy!]!
   departmentRoles(departmentId: Int!): [DepartmentRole!]!
+  departments(projectId: Int!): [Department!]!
 
   """Basic health check for the GraphQL API"""
   healthCheck: String!
@@ -237,6 +256,15 @@ type Query {
   user(id: Int!): User
   users: [User!]!
   workOrders(projectId: Int!): [WorkOrderPdf!]!
+}
+
+input SetDepartmentRolePolicyInput {
+  canCreate: Boolean!
+  canDelete: Boolean!
+  canEdit: Boolean!
+  canView: Boolean!
+  resource: String!
+  roleId: Int!
 }
 
 input SetPermissionInput {

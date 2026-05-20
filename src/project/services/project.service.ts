@@ -12,6 +12,160 @@ export class ProjectService {
         private readonly storage: StorageService,
     ) { }
 
+    private readonly defaultUserViewResources = ['WORK_ORDER', 'TASK', 'SUBTASK', 'DEPARTMENT', 'USER'];
+
+    private normalizeResource(resource?: string | null) {
+        return (resource || '').trim().toUpperCase();
+    }
+
+    private createEmptyAccess() {
+        return {
+            canView: false,
+            canCreate: false,
+            canEdit: false,
+            canDelete: false,
+        };
+    }
+
+    private setAccess(
+        accessMap: Record<string, { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean }>,
+        resource: string,
+        flags: { canView?: boolean; canCreate?: boolean; canEdit?: boolean; canDelete?: boolean },
+    ) {
+        const key = this.normalizeResource(resource);
+        if (!key) return;
+        accessMap[key] = {
+            canView: !!flags.canView,
+            canCreate: !!flags.canCreate,
+            canEdit: !!flags.canEdit,
+            canDelete: !!flags.canDelete,
+        };
+    }
+
+    private mergeAccess(
+        accessMap: Record<string, { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean }>,
+        resource: string,
+        flags: { canView?: boolean; canCreate?: boolean; canEdit?: boolean; canDelete?: boolean },
+    ) {
+        const key = this.normalizeResource(resource);
+        if (!key) return;
+        if (!accessMap[key]) accessMap[key] = this.createEmptyAccess();
+        accessMap[key].canView = accessMap[key].canView || !!flags.canView;
+        accessMap[key].canCreate = accessMap[key].canCreate || !!flags.canCreate;
+        accessMap[key].canEdit = accessMap[key].canEdit || !!flags.canEdit;
+        accessMap[key].canDelete = accessMap[key].canDelete || !!flags.canDelete;
+    }
+
+    private canAccess(
+        accessMap: Record<string, { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean }>,
+        resource: string,
+        action: 'canView' | 'canCreate' | 'canEdit' | 'canDelete' = 'canView',
+    ) {
+        const key = this.normalizeResource(resource);
+        return !!accessMap[key]?.[action];
+    }
+
+    private async getAccessMapForProjectUser(projectUser: {
+        projectRoleId: number | null;
+        departmentRoleId: number | null;
+        departmentId: number | null;
+    }) {
+        const accessMap: Record<string, { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean }> = {};
+
+        const projectRolePermissions = projectUser.projectRoleId
+            ? await this.prisma.permission.findMany({
+                where: {
+                    projectRoleId: projectUser.projectRoleId,
+                    OR: [
+                        { departmentId: null },
+                        ...(projectUser.departmentId ? [{ departmentId: projectUser.departmentId }] : []),
+                    ],
+                },
+            })
+            : [];
+
+        const departmentRolePolicies = projectUser.departmentRoleId
+            ? await this.prisma.departmentRolePolicy.findMany({
+                where: { departmentRoleId: projectUser.departmentRoleId },
+            })
+            : [];
+
+        if (departmentRolePolicies.length > 0) {
+            // Department-role policy is authoritative for resources it defines.
+            departmentRolePolicies.forEach((policy) => {
+                this.setAccess(accessMap, policy.resource, {
+                    canView: policy.canView,
+                    canCreate: policy.canCreate,
+                    canEdit: policy.canEdit,
+                    canDelete: policy.canDelete,
+                });
+            });
+
+            // Fall back to project-role permissions only for resources not set on department role.
+            projectRolePermissions.forEach((permission) => {
+                const key = this.normalizeResource(permission.resource);
+                if (!accessMap[key]) {
+                    this.setAccess(accessMap, permission.resource, {
+                        canView: permission.canView,
+                        canCreate: permission.canCreate,
+                        canEdit: permission.canEdit,
+                        canDelete: permission.canDelete,
+                    });
+                }
+            });
+        } else {
+            projectRolePermissions.forEach((permission) => {
+                this.mergeAccess(accessMap, permission.resource, {
+                    canView: permission.canView,
+                    canCreate: permission.canCreate,
+                    canEdit: permission.canEdit,
+                    canDelete: permission.canDelete,
+                });
+            });
+        }
+
+        const hasAnyPolicy = projectRolePermissions.length > 0 || departmentRolePolicies.length > 0;
+        if (!hasAnyPolicy) {
+            this.defaultUserViewResources.forEach((resource) => {
+                this.mergeAccess(accessMap, resource, { canView: true });
+            });
+        }
+
+        return accessMap;
+    }
+
+    private async applyViewerPolicyOnProject(project: any, viewerUserId: number) {
+        const membership = (project.users || []).find((user: any) => Number(user.userId) === Number(viewerUserId));
+        if (!membership) {
+            return {
+                ...project,
+                users: [],
+                departments: [],
+                tasks: [],
+                workOrders: [],
+            };
+        }
+
+        const accessMap = await this.getAccessMapForProjectUser({
+            projectRoleId: membership.projectRoleId ?? null,
+            departmentRoleId: membership.departmentRoleId ?? null,
+            departmentId: membership.departmentId ?? null,
+        });
+
+        const canViewUsers = this.canAccess(accessMap, 'USER', 'canView');
+        const canViewDepartments = this.canAccess(accessMap, 'DEPARTMENT', 'canView');
+        const canViewTasks = this.canAccess(accessMap, 'TASK', 'canView');
+        const canViewWorkOrders = this.canAccess(accessMap, 'WORK_ORDER', 'canView');
+
+        return {
+            ...project,
+            users: canViewUsers ? project.users : (project.users || []).filter((user: any) => Number(user.userId) === Number(viewerUserId)),
+            departments: canViewDepartments ? project.departments : [],
+            tasks: canViewTasks ? project.tasks : [],
+            workOrders: canViewWorkOrders ? project.workOrders : [],
+        };
+    }
+
     // ─── PROJECT CRUD ────────────────────────────────────────────
 
     async create(adminId: number, input: CreateProjectInput) {
@@ -47,6 +201,7 @@ export class ProjectService {
                                 user: { select: { id: true, firstName: true, lastName: true, email: true } },
                                 projectRole: true,
                                 department: true,
+                                departmentRole: true,
                             },
                         },
                         workOrders: { orderBy: { createdAt: 'desc' } },
@@ -56,11 +211,24 @@ export class ProjectService {
             },
         });
 
-        return memberships.map((m) => m.project);
+        const projects = await Promise.all(
+            memberships.map(async (membership) => {
+                const filteredProject = await this.applyViewerPolicyOnProject(membership.project, userId);
+                const workOrdersWithUrls = await Promise.all(
+                    (filteredProject.workOrders || []).map(async (workOrder: any) => ({
+                        ...workOrder,
+                        fileUrl: await this.storage.getPresignedUrl(workOrder.fileKey, workOrder.fileName),
+                    })),
+                );
+                return { ...filteredProject, workOrders: workOrdersWithUrls };
+            }),
+        );
+
+        return projects;
     }
 
-    async findOne(id: number) {
-        const project = await this.prisma.project.findUnique({
+    async findOne(id: number, viewer?: { userId: number; role?: string }) {
+        let project = await this.prisma.project.findUnique({
             where: { id },
             include: {
                 admin: { select: { id: true, firstName: true, lastName: true } },
@@ -73,18 +241,29 @@ export class ProjectService {
                         user: { select: { id: true, firstName: true, lastName: true, email: true } },
                         projectRole: true,
                         department: true,
+                        departmentRole: true,
                     },
                 },
             },
         });
         if (!project) throw new NotFoundException(`Project with ID ${id} not found`);
+
+        if (viewer && viewer.role !== 'admin') {
+            const assigned = (project.users || []).some((user) => Number(user.userId) === Number(viewer.userId));
+            if (!assigned) {
+                throw new NotFoundException(`Project with ID ${id} not found`);
+            }
+            project = await this.applyViewerPolicyOnProject(project, viewer.userId);
+        }
+
+        const safeProject: any = project;
         const workOrdersWithUrls = await Promise.all(
-            project.workOrders.map(async (wo) => ({
+            (safeProject.workOrders || []).map(async (wo: any) => ({
                 ...wo,
                 fileUrl: await this.storage.getPresignedUrl(wo.fileKey, wo.fileName),
             })),
         );
-        return { ...project, workOrders: workOrdersWithUrls };
+        return { ...safeProject, workOrders: workOrdersWithUrls };
     }
 
     async update(id: number, input: UpdateProjectInput) {
@@ -136,6 +315,7 @@ export class ProjectService {
                 user: { select: { id: true, firstName: true, lastName: true, email: true } },
                 projectRole: true,
                 department: true,
+                departmentRole: true,
             },
         });
     }
@@ -153,6 +333,7 @@ export class ProjectService {
                 user: { select: { id: true, firstName: true, lastName: true, email: true } },
                 projectRole: true,
                 department: true,
+                departmentRole: true,
             },
         });
     }
@@ -278,6 +459,7 @@ export class ProjectService {
                 user: { select: { id: true, firstName: true, lastName: true, email: true } },
                 projectRole: true,
                 department: true,
+                departmentRole: true,
             },
         });
     }
@@ -290,6 +472,7 @@ export class ProjectService {
                 user: { select: { id: true, firstName: true, lastName: true, email: true } },
                 projectRole: true,
                 department: true,
+                departmentRole: true,
             },
         });
     }
@@ -361,14 +544,68 @@ export class ProjectService {
         return true;
     }
 
+    async getDepartmentRolePolicies(roleId: number) {
+        await this.prisma.departmentRole.findUniqueOrThrow({ where: { id: roleId } });
+        return this.prisma.departmentRolePolicy.findMany({
+            where: { departmentRoleId: roleId },
+            orderBy: { resource: 'asc' },
+        });
+    }
+
+    async setDepartmentRolePolicy(
+        roleId: number,
+        resource: string,
+        canView: boolean,
+        canCreate: boolean,
+        canEdit: boolean,
+        canDelete: boolean,
+    ) {
+        await this.prisma.departmentRole.findUniqueOrThrow({ where: { id: roleId } });
+        const normalizedResource = resource.trim().toUpperCase();
+        if (!normalizedResource) throw new ConflictException('Resource is required');
+
+        return this.prisma.departmentRolePolicy.upsert({
+            where: {
+                departmentRoleId_resource: {
+                    departmentRoleId: roleId,
+                    resource: normalizedResource,
+                },
+            },
+            update: { canView, canCreate, canEdit, canDelete },
+            create: {
+                departmentRoleId: roleId,
+                resource: normalizedResource,
+                canView,
+                canCreate,
+                canEdit,
+                canDelete,
+            },
+        });
+    }
+
+    async removeDepartmentRolePolicy(id: number) {
+        await this.prisma.departmentRolePolicy.findUniqueOrThrow({ where: { id } });
+        await this.prisma.departmentRolePolicy.delete({ where: { id } });
+        return true;
+    }
+
     async assignUserToDepartment(projectId: number, userId: number, departmentId: number) {
+        const department = await this.prisma.department.findUniqueOrThrow({
+            where: { id: departmentId },
+            select: { id: true, projectId: true },
+        });
+        if (department.projectId !== projectId) {
+            throw new ConflictException('Department does not belong to this project');
+        }
+
         return this.prisma.projectUser.update({
             where: { projectId_userId: { projectId, userId } },
-            data: { departmentId },
+            data: { departmentId, departmentRoleId: null },
             include: {
                 user: { select: { id: true, firstName: true, lastName: true, email: true } },
                 projectRole: true,
                 department: true,
+                departmentRole: true,
             },
         });
     }
@@ -376,11 +613,58 @@ export class ProjectService {
     async removeUserFromDepartment(projectId: number, userId: number) {
         return this.prisma.projectUser.update({
             where: { projectId_userId: { projectId, userId } },
-            data: { departmentId: null },
+            data: { departmentId: null, departmentRoleId: null },
             include: {
                 user: { select: { id: true, firstName: true, lastName: true, email: true } },
                 projectRole: true,
                 department: true,
+                departmentRole: true,
+            },
+        });
+    }
+
+    async setUserDepartmentRole(projectId: number, userId: number, departmentRoleId: number) {
+        await this.prisma.projectUser.findUniqueOrThrow({
+            where: { projectId_userId: { projectId, userId } },
+            select: { id: true },
+        });
+
+        const role = await this.prisma.departmentRole.findUniqueOrThrow({
+            where: { id: departmentRoleId },
+            select: {
+                id: true,
+                departmentId: true,
+                department: { select: { projectId: true } },
+            },
+        });
+        if (role.department.projectId !== projectId) {
+            throw new ConflictException('Department role does not belong to this project');
+        }
+
+        return this.prisma.projectUser.update({
+            where: { projectId_userId: { projectId, userId } },
+            data: {
+                departmentId: role.departmentId,
+                departmentRoleId: role.id,
+            },
+            include: {
+                user: { select: { id: true, firstName: true, lastName: true, email: true } },
+                projectRole: true,
+                department: true,
+                departmentRole: true,
+            },
+        });
+    }
+
+    async unsetUserDepartmentRole(projectId: number, userId: number) {
+        return this.prisma.projectUser.update({
+            where: { projectId_userId: { projectId, userId } },
+            data: { departmentRoleId: null },
+            include: {
+                user: { select: { id: true, firstName: true, lastName: true, email: true } },
+                projectRole: true,
+                department: true,
+                departmentRole: true,
             },
         });
     }
@@ -448,9 +732,54 @@ export class ProjectService {
 
     // ─── TASKS ───────────────────────────────────────────────────
 
-    async getTasks(projectId: number, departmentId?: number) {
+    async getTasks(projectId: number, departmentId?: number, viewer?: { userId: number; role?: string }) {
+        let scopedWhere: any = { projectId };
+
+        if (viewer && viewer.role !== 'admin') {
+            const projectUser = await this.prisma.projectUser.findUnique({
+                where: { projectId_userId: { projectId, userId: viewer.userId } },
+                select: {
+                    userId: true,
+                    departmentId: true,
+                    projectRoleId: true,
+                    departmentRoleId: true,
+                },
+            });
+
+            if (!projectUser) {
+                return [];
+            }
+
+            const accessMap = await this.getAccessMapForProjectUser({
+                projectRoleId: projectUser.projectRoleId,
+                departmentRoleId: projectUser.departmentRoleId,
+                departmentId: projectUser.departmentId,
+            });
+
+            if (!this.canAccess(accessMap, 'TASK', 'canView')) {
+                return [];
+            }
+
+            if (departmentId && projectUser.departmentId && departmentId !== projectUser.departmentId) {
+                return [];
+            }
+
+            if (!departmentId && projectUser.departmentId) {
+                scopedWhere = {
+                    ...scopedWhere,
+                    OR: [
+                        { departmentId: projectUser.departmentId },
+                        { assignedTo: viewer.userId },
+                    ],
+                };
+            }
+        }
+
         return this.prisma.task.findMany({
-            where: { projectId, ...(departmentId ? { departmentId } : {}) },
+            where: {
+                ...scopedWhere,
+                ...(departmentId ? { departmentId } : {}),
+            },
             include: {
                 assignee: { select: { id: true, firstName: true, lastName: true, email: true } },
                 department: true,
