@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>AtlasPM Dashboard</title>
+<link rel='stylesheet' href='css/system.css'>
+</head>
+<body>
+<div class='layout'>
+  <aside class='sidebar'>
+    <div class='brand'><i></i>AtlasPM Enterprise</div>
+    <nav class='nav'>
+      <a href='dashboard.html' class='active'>Dashboard</a>
+      <a href='projects.html' >Projects</a>
+      <a href='project-detail.html' >Project Detail</a>
+      <a href='resource-planning.html' >Resources</a>
+      <a href='reports.html' >Reports</a>
+      <a href='settings.html' >Settings</a>
+    </nav>
+  </aside>
+  <main class='main'><header class='topbar'><div class='title'><h1>Enterprise Portfolio Dashboard</h1><p>Operational pulse across programs, delivery risk, and budget burn.</p></div><div class='actions'><button class='btn'>Export snapshot</button><button class='btn primary' data-open-drawer>New item</button></div></header>
+<section class='kpi-grid'>
+  <article class='card kpi'><div class='label'>Active Projects</div><div class='value'>42</div><div class='delta ok'>+3 this quarter</div></article>
+  <article class='card kpi'><div class='label'>On-time Milestones</div><div class='value'>87.4%</div><div class='delta ok'>+2.1%</div></article>
+  <article class='card kpi'><div class='label'>Portfolio Budget Utilized</div><div class='value'>.8M</div><div class='delta warn'>74% of annual plan</div></article>
+  <article class='card kpi'><div class='label'>Open Risks (High)</div><div class='value'>9</div><div class='delta danger'>Needs exec review</div></article>
+</section>
+<section class='grid-2'>
+  <article class='card section'><h2>Program Health by Department</h2><table class='table'><thead><tr><th>Department</th><th>Portfolio</th><th>Budget</th><th>Status</th></tr></thead><tbody><tr><td>Operations</td><td>11 projects</td><td>.2M</td><td><span class='badge ok'>Healthy</span></td></tr><tr><td>Technology</td><td>16 projects</td><td>.1M</td><td><span class='badge warn'>Watch</span></td></tr><tr><td>Compliance</td><td>6 projects</td><td>.3M</td><td><span class='badge ok'>Healthy</span></td></tr><tr><td>Revenue Ops</td><td>9 projects</td><td>.2M</td><td><span class='badge danger'>At risk</span></td></tr></tbody></table></article>
+  <article class='card section'><h2>Approval Queue</h2><div class='list'><div class='list-item'><strong>Vendor expansion change order</strong><span class='badge warn'>Due in 6h</span></div><div class='list-item'><strong>Security uplift budget amendment</strong><span class='badge danger'>Overdue</span></div><div class='list-item'><strong>Q3 hiring wave allocation</strong><span class='badge neutral'>Awaiting CFO</span></div></div></article>
+</section></main>
+</div>
+<div class='scrim'></div>
+<div class='drawer'>
+  <div class='topbar' style='position:static;background:transparent;border:0;padding:0'>
+    <div class='title'><h1>Quick Create</h1><p>Create task, risk, or approval packet.</p></div>
+    <button class='btn' data-close-drawer>Close</button>
+  </div>
+  <form class='form-grid' data-validate='form'>
+    <label>Title<input class='input' required></label>
+    <label>Owner<input class='input' required></label>
+    <label>Module<select><option>Task</option><option>Risk</option><option>Change Request</option></select></label>
+    <label>Notes<textarea rows='4'></textarea></label>
+    <button class='btn primary'>Submit</button>
+    <span class='badge neutral' data-validate='message'>Awaiting input</span>
+  </form>
+</div>
+<script src='js/app.js'></script>
+</body>
+</html>

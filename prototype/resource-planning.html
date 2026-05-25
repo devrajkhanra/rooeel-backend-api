@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>AtlasPM Resource Planning</title>
+<link rel='stylesheet' href='css/system.css'>
+</head>
+<body>
+<div class='layout'>
+  <aside class='sidebar'>
+    <div class='brand'><i></i>AtlasPM Enterprise</div>
+    <nav class='nav'>
+      <a href='dashboard.html' >Dashboard</a>
+      <a href='projects.html' >Projects</a>
+      <a href='project-detail.html' >Project Detail</a>
+      <a href='resource-planning.html' class='active'>Resources</a>
+      <a href='reports.html' >Reports</a>
+      <a href='settings.html' >Settings</a>
+    </nav>
+  </aside>
+  <main class='main'><header class='topbar'><div class='title'><h1>Resource Allocation Planner</h1><p>Capacity, utilization, and role-level staffing heatmap.</p></div><div class='actions'><button class='btn'>Download staffing plan</button><button class='btn primary' data-open-drawer>Request allocation</button></div></header>
+<section class='grid-2'>
+  <article class='card section'><h2>Role Capacity Matrix (next 8 weeks)</h2><table class='table'><thead><tr><th>Role</th><th>Headcount</th><th>Utilization</th><th>Action</th></tr></thead><tbody><tr><td>Backend Engineers</td><td>26</td><td>92%</td><td><span class='badge warn'>Add 3 contractors</span></td></tr><tr><td>QA Automation</td><td>11</td><td>88%</td><td><span class='badge ok'>Balanced</span></td></tr><tr><td>Business Analysts</td><td>9</td><td>97%</td><td><span class='badge danger'>Critical overload</span></td></tr><tr><td>PMO Coordinators</td><td>7</td><td>78%</td><td><span class='badge neutral'>Can absorb</span></td></tr></tbody></table></article>
+  <article class='card section'><h2>Staffing Risks</h2><div class='list'><div class='list-item'><span>Data migration pod lacks night-shift support</span><span class='badge warn'>Priority 1</span></div><div class='list-item'><span>Dual-assigned architects in release week 31</span><span class='badge danger'>Conflict</span></div><div class='list-item'><span>Onboarding lead available for two new squads</span><span class='badge ok'>Opportunity</span></div></div></article>
+</section></main>
+</div>
+<div class='scrim'></div>
+<div class='drawer'>
+  <div class='topbar' style='position:static;background:transparent;border:0;padding:0'>
+    <div class='title'><h1>Quick Create</h1><p>Create task, risk, or approval packet.</p></div>
+    <button class='btn' data-close-drawer>Close</button>
+  </div>
+  <form class='form-grid' data-validate='form'>
+    <label>Title<input class='input' required></label>
+    <label>Owner<input class='input' required></label>
+    <label>Module<select><option>Task</option><option>Risk</option><option>Change Request</option></select></label>
+    <label>Notes<textarea rows='4'></textarea></label>
+    <button class='btn primary'>Submit</button>
+    <span class='badge neutral' data-validate='message'>Awaiting input</span>
+  </form>
+</div>
+<script src='js/app.js'></script>
+</body>
+</html>

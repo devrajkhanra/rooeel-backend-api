@@ -11,13 +11,12 @@ import {
     ParseIntPipe,
     BadRequestException,
     Body,
-    Res,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ProjectService } from './services/project.service';
 import { RestAdminGuard } from '../auth/guards/rest-admin.guard';
-import type { Response } from 'express';
+import { RestAuthGuard } from '../auth/guards/rest-auth.guard';
 
 @Controller('project')
 export class ProjectController {
@@ -56,16 +55,14 @@ export class ProjectController {
         return this.projectService.deleteWorkOrder(workOrderId);
     }
 
-    @UseGuards(RestAdminGuard)
+    @UseGuards(RestAuthGuard)
     @Get(':projectId/work-order/:workOrderId/view')
     async viewWorkOrder(
         @Param('projectId', ParseIntPipe) projectId: number,
         @Param('workOrderId', ParseIntPipe) workOrderId: number,
-        @Res() res: Response,
+        @Request() req: any,
     ) {
-        const { stream, fileName } = await this.projectService.getWorkOrderForViewing(projectId, workOrderId);
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
-        stream.pipe(res);
+        await this.projectService.assertCanViewWorkOrder(projectId, req.user);
+        return this.projectService.getWorkOrderViewUrl(projectId, workOrderId);
     }
 }

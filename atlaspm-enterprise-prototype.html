@@ -1,0 +1,37 @@
+
+<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>AtlasPM Prototype Launcher</title>
+<link rel='stylesheet' href='css/system.css'>
+<style>
+.wrap{max-width:1150px;margin:0 auto;padding:22px 18px 32px}
+.hero{padding:20px;border:1px solid var(--border);background:var(--surface);border-radius:18px;box-shadow:var(--shadow-sm)}
+.hero h1{margin:0;font-family:var(--font-display);letter-spacing:-.02em;font-size:clamp(1.4rem,2.2vw,2rem)}
+.hero p{margin:10px 0 0;color:var(--muted);max-width:70ch}
+.cards{margin-top:14px;display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:12px}
+.screen{display:block;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}
+.screen strong{font-family:var(--font-display)}
+.screen span{display:block;margin-top:8px;color:var(--muted);font-size:.9rem}
+@media(max-width:920px){.cards{grid-template-columns:1fr 1fr}} @media(max-width:620px){.cards{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class='wrap'>
+  <section class='hero'>
+    <h1>AtlasPM Enterprise Project Management Prototype</h1>
+    <p>High-fidelity responsive web concept with portfolio governance, delivery operations, resource planning, and executive reporting. Open any screen below to review desktop, tablet, and mobile behavior.</p>
+  </section>
+  <section class='cards'>
+    <a class='screen' href='dashboard.html'><strong>Dashboard</strong><span>Portfolio health KPIs, approvals queue, department health.</span></a>
+    <a class='screen' href='projects.html'><strong>Projects</strong><span>Searchable project list with risk and spend tracking.</span></a>
+    <a class='screen' href='project-detail.html'><strong>Project Detail</strong><span>Tabbed module for tasks, risks, and budget controls.</span></a>
+    <a class='screen' href='resource-planning.html'><strong>Resource Planning</strong><span>Role capacity, utilization, and staffing risk modules.</span></a>
+    <a class='screen' href='reports.html'><strong>Executive Reports</strong><span>Board-facing operational and financial reporting.</span></a>
+    <a class='screen' href='settings.html'><strong>Governance Settings</strong><span>Approval workflow and permission model controls.</span></a>
+  </section>
+</main>
+</body>
+</html>

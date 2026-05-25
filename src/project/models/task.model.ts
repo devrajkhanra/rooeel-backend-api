@@ -32,6 +32,9 @@ export class Task {
     @Field({ nullable: true })
     submissionData?: string;
 
+    @Field(() => Int, { nullable: true })
+    assignedTo?: number;
+
     @Field(() => User, { nullable: true })
     assignee?: User;
 

@@ -234,7 +234,8 @@ export class ProjectResolver {
 
     // ── DYNAMIC FIELDS ────────────────────────────────────────
 
-    @UseGuards(GqlUserGuard)
+    @UseGuards(ProjectPermissionGuard)
+    @CheckPermission('PROJECT_FIELD', 'view')
     @Query(() => [ProjectField], { name: 'projectFields' })
     getFields(@Args('projectId', { type: () => Int }) projectId: number) {
         return this.projectService.getFields(projectId);
@@ -255,7 +256,8 @@ export class ProjectResolver {
         return this.projectService.deleteField(fieldId);
     }
 
-    @UseGuards(GqlAdminGuard)
+    @UseGuards(ProjectPermissionGuard)
+    @CheckPermission('PROJECT_FIELD', 'edit')
     @Mutation(() => ProjectFieldValue, { name: 'setFieldValue' })
     setFieldValue(
         @Args('projectId', { type: () => Int }) projectId: number,
@@ -539,8 +541,9 @@ export class ProjectResolver {
     createTask(
         @Args('projectId', { type: () => Int }) projectId: number,
         @Args('input') input: CreateTaskInput,
+        @CurrentUser() user?: any,
     ) {
-        return this.projectService.createTask(projectId, input);
+        return this.projectService.createTask(projectId, input, user);
     }
 
     @UseGuards(GqlUserGuard)
@@ -548,19 +551,24 @@ export class ProjectResolver {
     updateTask(
         @Args('id', { type: () => Int }) id: number,
         @Args('input') input: UpdateTaskInput,
+        @CurrentUser() user?: any,
     ) {
-        return this.projectService.updateTask(id, input);
+        return this.projectService.updateTask(id, input, user);
     }
 
     @UseGuards(GqlUserGuard)
     @Mutation(() => Boolean, { name: 'removeTask' })
-    removeTask(@Args('id', { type: () => Int }) id: number) {
-        return this.projectService.removeTask(id);
+    removeTask(
+        @Args('id', { type: () => Int }) id: number,
+        @CurrentUser() user?: any,
+    ) {
+        return this.projectService.removeTask(id, user);
     }
 
     // ── SUBTASKS ──────────────────────────────────────────────
 
-    @UseGuards(GqlUserGuard)
+    @UseGuards(ProjectPermissionGuard)
+    @CheckPermission('SUBTASK', 'create')
     @Mutation(() => SubTask, { name: 'createSubTask' })
     createSubTask(
         @Args('taskId', { type: () => Int }) taskId: number,
@@ -569,7 +577,8 @@ export class ProjectResolver {
         return this.projectService.createSubTask(taskId, input);
     }
 
-    @UseGuards(GqlUserGuard)
+    @UseGuards(ProjectPermissionGuard)
+    @CheckPermission('SUBTASK', 'edit')
     @Mutation(() => SubTask, { name: 'updateSubTask' })
     updateSubTask(
         @Args('id', { type: () => Int }) id: number,
@@ -578,7 +587,8 @@ export class ProjectResolver {
         return this.projectService.updateSubTask(id, input);
     }
 
-    @UseGuards(GqlUserGuard)
+    @UseGuards(ProjectPermissionGuard)
+    @CheckPermission('SUBTASK', 'delete')
     @Mutation(() => Boolean, { name: 'removeSubTask' })
     removeSubTask(@Args('id', { type: () => Int }) id: number) {
         return this.projectService.removeSubTask(id);

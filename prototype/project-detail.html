@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>AtlasPM Project Detail</title>
+<link rel='stylesheet' href='css/system.css'>
+</head>
+<body>
+<div class='layout'>
+  <aside class='sidebar'>
+    <div class='brand'><i></i>AtlasPM Enterprise</div>
+    <nav class='nav'>
+      <a href='dashboard.html' >Dashboard</a>
+      <a href='projects.html' >Projects</a>
+      <a href='project-detail.html' class='active'>Project Detail</a>
+      <a href='resource-planning.html' >Resources</a>
+      <a href='reports.html' >Reports</a>
+      <a href='settings.html' >Settings</a>
+    </nav>
+  </aside>
+  <main class='main'><header class='topbar'><div class='title'><h1>Global ERP Migration</h1><p class='mono'>PRJ-2026-041 • Program: Core Systems Modernization</p></div><div class='actions'><button class='btn'>Timeline PDF</button><button class='btn primary' data-open-drawer>Add task</button></div></header>
+<section class='card section'>
+  <div data-tab-group class='tabs'><button class='tab active' data-tab='overview'>Overview</button><button class='tab' data-tab='tasks'>Tasks</button><button class='tab' data-tab='risks'>Risks</button><button class='tab' data-tab='budget'>Budget</button></div>
+  <div data-pane='overview'><div class='kpi-grid'><article class='card kpi'><div class='label'>Timeline Confidence</div><div class='value'>74%</div><div class='delta warn'>Critical path under review</div></article><article class='card kpi'><div class='label'>Scope Change Requests</div><div class='value'>12</div><div class='delta danger'>4 pending approval</div></article><article class='card kpi'><div class='label'>Dependencies</div><div class='value'>27</div><div class='delta'>Across 5 teams</div></article><article class='card kpi'><div class='label'>QA Pass Rate</div><div class='value'>92%</div><div class='delta ok'>Stable</div></article></div></div>
+  <div data-pane='tasks' hidden><table class='table'><thead><tr><th>Task</th><th>Owner</th><th>Sprint</th><th>Status</th></tr></thead><tbody><tr><td>Legacy schema mapping validation</td><td>S. Iyer</td><td>Sprint 18</td><td><span class='badge warn'>In review</span></td></tr><tr><td>Middleware retry logic hardening</td><td>D. Khan</td><td>Sprint 18</td><td><span class='badge ok'>On track</span></td></tr></tbody></table></div>
+  <div data-pane='risks' hidden><div class='list'><div class='list-item'><span>Vendor API rate limits may delay migration window</span><span class='badge danger'>Mitigation needed</span></div><div class='list-item'><span>Regional training readiness below threshold</span><span class='badge warn'>Monitoring</span></div></div></div>
+  <div data-pane='budget' hidden><table class='table'><thead><tr><th>Category</th><th>Allocated</th><th>Actual</th><th>Variance</th></tr></thead><tbody><tr><td>Implementation Partner</td><td>.2M</td><td>.0M</td><td class='ok'>-</td></tr><tr><td>Infrastructure</td><td>.1M</td><td>.23M</td><td class='danger'>+</td></tr></tbody></table></div>
+</section></main>
+</div>
+<div class='scrim'></div>
+<div class='drawer'>
+  <div class='topbar' style='position:static;background:transparent;border:0;padding:0'>
+    <div class='title'><h1>Quick Create</h1><p>Create task, risk, or approval packet.</p></div>
+    <button class='btn' data-close-drawer>Close</button>
+  </div>
+  <form class='form-grid' data-validate='form'>
+    <label>Title<input class='input' required></label>
+    <label>Owner<input class='input' required></label>
+    <label>Module<select><option>Task</option><option>Risk</option><option>Change Request</option></select></label>
+    <label>Notes<textarea rows='4'></textarea></label>
+    <button class='btn primary'>Submit</button>
+    <span class='badge neutral' data-validate='message'>Awaiting input</span>
+  </form>
+</div>
+<script src='js/app.js'></script>
+</body>
+</html>

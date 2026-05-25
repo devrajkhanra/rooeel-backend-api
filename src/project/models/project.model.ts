@@ -6,6 +6,7 @@ import { Department } from './department.model';
 import { ProjectRole } from './project-role.model';
 import { Admin } from '../../admin/models/admin.model';
 import { Task } from './task.model';
+import { ProjectAccessPolicy } from './project-access-policy.model';
 
 @ObjectType()
 export class Project {
@@ -50,4 +51,7 @@ export class Project {
 
     @Field(() => [Task], { nullable: true })
     tasks?: Task[];
+
+    @Field(() => [ProjectAccessPolicy], { nullable: true })
+    effectiveAccessPolicies?: ProjectAccessPolicy[];
 }

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "AtlasPM Enterprise Prototype Launcher",
+  "entry": "atlaspm-enterprise-prototype.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "pdf",
+    "zip"
+  ],
+  "createdAt": "2026-05-20T15:03:38.157Z",
+  "updatedAt": "2026-05-20T15:03:38.169Z",
+  "metadata": {
+    "identifier": "atlaspm-enterprise-prototype",
+    "artifactType": "text/html",
+    "inferred": false
+  }
+}

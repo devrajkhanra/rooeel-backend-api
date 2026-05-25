@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 import { CreateProjectInput } from '../dto/create-project.input';
@@ -13,9 +13,207 @@ export class ProjectService {
     ) { }
 
     private readonly defaultUserViewResources = ['WORK_ORDER', 'TASK', 'SUBTASK', 'DEPARTMENT', 'USER'];
+    private readonly projectFieldResources = ['FIELD', 'PROJECT_FIELD'];
+    private readonly hardcodedTaskResources = [
+        'DRAWING_VIEW_FOLDERS',
+        'DRAWING_VIEW_REGISTERS',
+        'DRAWING_CREATE_FOLDER',
+        'DRAWING_RENAME_FOLDER',
+        'DRAWING_DELETE_FOLDER',
+        'DRAWING_VIEW_PDFS',
+        'DRAWING_UPLOAD_PDF',
+        'DRAWING_UPLOAD_MULTIPLE_PDFS',
+        'DRAWING_RENAME_PDF',
+        'DRAWING_DELETE_PDF',
+        'DRAWING_DELETE_MULTIPLE_PDFS',
+        'DRAWING_CREATE_REGISTER',
+        'DRAWING_DELETE_REGISTER',
+        'BILL_OF_MATERIAL_FOLDER_VIEW',
+        'BILL_OF_MATERIAL_FOLDER_CREATE',
+        'BILL_OF_MATERIAL_FOLDER_RENAME',
+        'BILL_OF_MATERIAL_FOLDER_DELETE',
+        'BILL_OF_MATERIAL_TRACK_CREATE',
+        'BILL_OF_MATERIAL_TRACK_VIEW',
+        'BILL_OF_MATERIAL_TRACK_RENAME',
+        'BILL_OF_MATERIAL_TRACK_EDIT',
+        'MIV_MIN_FOLDER_VIEW',
+        'MIV_MIN_FOLDER_CREATE',
+        'MIV_MIN_FOLDER_RENAME',
+        'MIV_MIN_FOLDER_DELETE',
+        'MIN_MIV_PDF_VIEW',
+        'MIN_MIV_PDF_UPLOAD',
+        'MIN_MIV_PDF_RENAME',
+        'MIN_MIV_PDF_DELETE',
+        'MIV_MIN_REGISTER_CREATE',
+        'MIV_MIN_REGISTER_VIEW',
+        'MIV_MIN_REGISTER_RENAME',
+        'MIV_MIN_REGISTER_DELETE',
+        'CHALLAN_FOLDER_VIEW',
+        'CHALLAN_FOLDER_CREATE',
+        'CHALLAN_FOLDER_RENAME',
+        'CHALLAN_FOLDER_DELETE',
+        'CHALLAN_PDF_VIEW',
+        'CHALLAN_PDF_UPLOAD',
+        'CHALLAN_PDF_RENAME',
+        'CHALLAN_PDF_DELETE',
+        'CHALLAN_REGISTER_CREATE',
+        'CHALLAN_REGISTER_VIEW',
+        'CHALLAN_REGISTER_RENAME',
+        'CHALLAN_REGISTER_DELETE',
+        'CHALLAN_REGISTER_EDIT',
+        'SCHEDULE_FOLDER_CREATE',
+        'SCHEDULE_FOLDER_RENAME',
+        'SCHEDULE_FOLDER_VIEW',
+        'SCHEDULE_FOLDER_DELETE',
+    ];
+    private readonly hardcodedViewOnlyResources = [
+        'DRAWING_VIEW_FOLDERS',
+        'DRAWING_VIEW_REGISTERS',
+        'DRAWING_VIEW_PDFS',
+        'BILL_OF_MATERIAL_FOLDER_VIEW',
+        'BILL_OF_MATERIAL_TRACK_VIEW',
+        'MIV_MIN_FOLDER_VIEW',
+        'MIN_MIV_PDF_VIEW',
+        'MIV_MIN_REGISTER_VIEW',
+        'CHALLAN_FOLDER_VIEW',
+        'CHALLAN_PDF_VIEW',
+        'CHALLAN_REGISTER_VIEW',
+        'SCHEDULE_FOLDER_VIEW',
+    ];
+    private readonly allowedPolicyResources = [
+        ...this.defaultUserViewResources,
+        ...this.projectFieldResources,
+        ...this.hardcodedTaskResources,
+    ];
+
+    private hasPolicyForAnyResource(
+        accessMap: Record<string, { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean }>,
+        resources: string[],
+    ) {
+        return resources.some((resource) => {
+            const key = this.normalizeResource(resource);
+            return !!accessMap[key];
+        });
+    }
+
+    private hasAccessForAnyResource(
+        accessMap: Record<string, { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean }>,
+        resources: string[],
+        action: 'canView' | 'canCreate' | 'canEdit' | 'canDelete' = 'canView',
+    ) {
+        return resources.some((resource) => this.canAccess(accessMap, resource, action));
+    }
+
+    private buildEffectiveAccessPolicies(
+        accessMap: Record<string, { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean }>,
+    ) {
+        return Object.entries(accessMap)
+            .map(([resource, flags]) => ({
+                resource,
+                canView: !!flags.canView,
+                canCreate: !!flags.canCreate,
+                canEdit: !!flags.canEdit,
+                canDelete: !!flags.canDelete,
+            }))
+            .sort((a, b) => a.resource.localeCompare(b.resource));
+    }
 
     private normalizeResource(resource?: string | null) {
         return (resource || '').trim().toUpperCase();
+    }
+
+    private normalizePolicyResource(resource?: string | null) {
+        const normalized = this.normalizeResource(resource);
+        const aliases: Record<string, string> = {
+            DRAWING_UPLOAD_MULTIPLE_PDF: 'DRAWING_UPLOAD_MULTIPLE_PDFS',
+            DRAWING_DELETE_MULTIPLE_PDF: 'DRAWING_DELETE_MULTIPLE_PDFS',
+            UPLOAD_MULTIPLE_PDFS: 'DRAWING_UPLOAD_MULTIPLE_PDFS',
+            DELETE_MULTIPLE_PDFS: 'DRAWING_DELETE_MULTIPLE_PDFS',
+            DRAWING_VIEW_FOLDER: 'DRAWING_VIEW_FOLDERS',
+            VIEW_FOLDERS: 'DRAWING_VIEW_FOLDERS',
+            DRAWING_VIEW_REGISTER: 'DRAWING_VIEW_REGISTERS',
+            VIEW_REGISTER: 'DRAWING_VIEW_REGISTERS',
+            VIEW_REGISTERS: 'DRAWING_VIEW_REGISTERS',
+            DRAWING_VIEW_PDF: 'DRAWING_VIEW_PDFS',
+            VIEW_PDFS: 'DRAWING_VIEW_PDFS',
+            BILL_OF_MATERIAL_VIEW_TRACK_REGISTER: 'BILL_OF_MATERIAL_TRACK_VIEW',
+            VIEW_BILL_OF_MATERIAL_TRACK_REGISTER: 'BILL_OF_MATERIAL_TRACK_VIEW',
+            BOM_TRACK_VIEW: 'BILL_OF_MATERIAL_TRACK_VIEW',
+            BILL_OF_MATERIAL_EDIT_TRACK_REGISTER: 'BILL_OF_MATERIAL_TRACK_EDIT',
+            EDIT_BILL_OF_MATERIAL_TRACK_REGISTER: 'BILL_OF_MATERIAL_TRACK_EDIT',
+            BOM_TRACK_EDIT: 'BILL_OF_MATERIAL_TRACK_EDIT',
+            BILL_OF_MATERIAL_CREATE_FOLDER: 'BILL_OF_MATERIAL_FOLDER_CREATE',
+            BILL_OF_MATERIAL_VIEW_FOLDER: 'BILL_OF_MATERIAL_FOLDER_VIEW',
+            BILL_OF_MATERIAL_RENAME_FOLDER: 'BILL_OF_MATERIAL_FOLDER_RENAME',
+            BILL_OF_MATERIAL_DELETE_FOLDER: 'BILL_OF_MATERIAL_FOLDER_DELETE',
+            CREATE_BILL_OF_MATERIALS_FOLDERS: 'BILL_OF_MATERIAL_FOLDER_CREATE',
+            VIEW_BILL_OF_MATERIALS_FOLDERS: 'BILL_OF_MATERIAL_FOLDER_VIEW',
+            RENAME_BILL_OF_MATERIALS_FOLDERS: 'BILL_OF_MATERIAL_FOLDER_RENAME',
+            DELETE_BILL_OF_MATERIALS_FOLDERS: 'BILL_OF_MATERIAL_FOLDER_DELETE',
+            BILL_OF_MATERIAL_TRACK_CREATE_REGISTER: 'BILL_OF_MATERIAL_TRACK_CREATE',
+            BILL_OF_MATERIAL_TRACK_RENAME_REGISTER: 'BILL_OF_MATERIAL_TRACK_RENAME',
+            CREATE_BILL_OF_MATERIALS_TRACK_REGISTER: 'BILL_OF_MATERIAL_TRACK_CREATE',
+            RENAME_BILL_OF_MATERIALS_TRACK_REGISTER: 'BILL_OF_MATERIAL_TRACK_RENAME',
+            MIV_MIN_CREATE_FOLDER: 'MIV_MIN_FOLDER_CREATE',
+            MIV_MIN_VIEW_FOLDER: 'MIV_MIN_FOLDER_VIEW',
+            MIV_MIN_RENAME_FOLDER: 'MIV_MIN_FOLDER_RENAME',
+            MIV_MIN_DELETE_FOLDER: 'MIV_MIN_FOLDER_DELETE',
+            CREATE_MIV_MIN_FOLDERS: 'MIV_MIN_FOLDER_CREATE',
+            VIEW_MIV_MIN_FOLDERS: 'MIV_MIN_FOLDER_VIEW',
+            RENAME_MIV_MIN_FOLDERS: 'MIV_MIN_FOLDER_RENAME',
+            DELETE_MIV_MIN_FOLDERS: 'MIV_MIN_FOLDER_DELETE',
+            MIN_MIV_VIEW_PDF: 'MIN_MIV_PDF_VIEW',
+            MIN_MIV_UPLOAD_PDF: 'MIN_MIV_PDF_UPLOAD',
+            MIN_MIV_RENAME_PDF: 'MIN_MIV_PDF_RENAME',
+            MIN_MIV_DELETE_PDF: 'MIN_MIV_PDF_DELETE',
+            VIEW_MIN_MIV_PDF: 'MIN_MIV_PDF_VIEW',
+            UPLOAD_MIN_MIV_PDF: 'MIN_MIV_PDF_UPLOAD',
+            RENAME_MIN_MIV_PDF: 'MIN_MIV_PDF_RENAME',
+            DELETE_MIN_MIV_PDF: 'MIN_MIV_PDF_DELETE',
+            MIV_MIN_CREATE_REGISTER: 'MIV_MIN_REGISTER_CREATE',
+            MIV_MIN_VIEW_REGISTER: 'MIV_MIN_REGISTER_VIEW',
+            MIV_MIN_RENAME_REGISTER: 'MIV_MIN_REGISTER_RENAME',
+            MIV_MIN_DELETE_REGISTER: 'MIV_MIN_REGISTER_DELETE',
+            CREATE_MIV_MIN_REGISTER: 'MIV_MIN_REGISTER_CREATE',
+            VIEW_MIV_MIN_REGISTER: 'MIV_MIN_REGISTER_VIEW',
+            RENAME_MIV_MIN_REGISTER: 'MIV_MIN_REGISTER_RENAME',
+            DELETE_MIV_MIN_REGISTER: 'MIV_MIN_REGISTER_DELETE',
+            CHALLAN_CREATE_FOLDER: 'CHALLAN_FOLDER_CREATE',
+            CHALLAN_VIEW_FOLDER: 'CHALLAN_FOLDER_VIEW',
+            CHALLAN_RENAME_FOLDER: 'CHALLAN_FOLDER_RENAME',
+            CHALLAN_DELETE_FOLDER: 'CHALLAN_FOLDER_DELETE',
+            CREATE_CHALLAN_FOLDERS: 'CHALLAN_FOLDER_CREATE',
+            VIEW_CHALLAN_FOLDERS: 'CHALLAN_FOLDER_VIEW',
+            RENAME_CHALLAN_FOLDERS: 'CHALLAN_FOLDER_RENAME',
+            DELETE_CHALLAN_FOLDERS: 'CHALLAN_FOLDER_DELETE',
+            CHALLAN_VIEW_PDF: 'CHALLAN_PDF_VIEW',
+            CHALLAN_UPLOAD_PDF: 'CHALLAN_PDF_UPLOAD',
+            CHALLAN_RENAME_PDF: 'CHALLAN_PDF_RENAME',
+            CHALLAN_DELETE_PDF: 'CHALLAN_PDF_DELETE',
+            VIEW_CHALLAN_PDF: 'CHALLAN_PDF_VIEW',
+            UPLOAD_CHALLAN_PDF: 'CHALLAN_PDF_UPLOAD',
+            RENAME_CHALLAN_PDF: 'CHALLAN_PDF_RENAME',
+            DELETE_CHALLAN_PDF: 'CHALLAN_PDF_DELETE',
+            CHALLAN_CREATE_REGISTER: 'CHALLAN_REGISTER_CREATE',
+            CHALLAN_VIEW_REGISTER: 'CHALLAN_REGISTER_VIEW',
+            CHALLAN_RENAME_REGISTER: 'CHALLAN_REGISTER_RENAME',
+            CHALLAN_DELETE_REGISTER: 'CHALLAN_REGISTER_DELETE',
+            CHALLAN_EDIT_REGISTER: 'CHALLAN_REGISTER_EDIT',
+            CREATE_CHALLAN_REGISTER: 'CHALLAN_REGISTER_CREATE',
+            VIEW_CHALLAN_REGISTER: 'CHALLAN_REGISTER_VIEW',
+            RENAME_CHALLAN_REGISTER: 'CHALLAN_REGISTER_RENAME',
+            DELETE_CHALLAN_REGISTER: 'CHALLAN_REGISTER_DELETE',
+            EDIT_CHALLAN_REGISTER: 'CHALLAN_REGISTER_EDIT',
+            SCHEDULE_CREATE_FOLDER: 'SCHEDULE_FOLDER_CREATE',
+            SCHEDULE_RENAME_FOLDER: 'SCHEDULE_FOLDER_RENAME',
+            SCHEDULE_VIEW_FOLDER: 'SCHEDULE_FOLDER_VIEW',
+            SCHEDULE_DELETE_FOLDER: 'SCHEDULE_FOLDER_DELETE',
+            CREATE_SCHEDULE_FOLDERS: 'SCHEDULE_FOLDER_CREATE',
+            RENAME_SCHEDULE_FOLDERS: 'SCHEDULE_FOLDER_RENAME',
+            VIEW_SCHEDULE_FOLDERS: 'SCHEDULE_FOLDER_VIEW',
+            DELETE_SCHEDULE_FOLDERS: 'SCHEDULE_FOLDER_DELETE',
+        };
+        return aliases[normalized] || normalized;
     }
 
     private createEmptyAccess() {
@@ -65,12 +263,156 @@ export class ProjectService {
         return !!accessMap[key]?.[action];
     }
 
+    private isBillingOrPlanningDepartment(name?: string | null) {
+        const value = (name || '').toLowerCase();
+        return value.includes('billing') || value.includes('planning');
+    }
+
+    private isHardcodedTaskResource(resource?: string | null) {
+        return this.hardcodedTaskResources.includes(this.normalizeResource(resource));
+    }
+
+    private isHardcodedViewOnlyResource(resource?: string | null) {
+        return this.hardcodedViewOnlyResources.includes(this.normalizeResource(resource));
+    }
+
+    private buildPolicyFlags(
+        resource: string,
+        flags: { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean },
+    ) {
+        if (this.isHardcodedViewOnlyResource(resource)) {
+            return {
+                canView: flags.canView,
+                canCreate: false,
+                canEdit: false,
+                canDelete: false,
+            };
+        }
+
+        if (this.isHardcodedTaskResource(resource)) {
+            return {
+                canView: flags.canView || flags.canCreate || flags.canEdit || flags.canDelete,
+                canCreate: flags.canCreate,
+                canEdit: flags.canEdit,
+                canDelete: flags.canDelete,
+            };
+        }
+
+        return flags;
+    }
+
+    private parseJsonLike(value: unknown): unknown {
+        let current = value;
+        for (let depth = 0; depth < 2; depth += 1) {
+            if (typeof current !== 'string') return current;
+            const trimmed = current.trim();
+            if (!trimmed) return undefined;
+            try {
+                current = JSON.parse(trimmed);
+            } catch {
+                return current;
+            }
+        }
+        return current;
+    }
+
+    private serializeJsonForGraphql(value: unknown) {
+        if (value === null || value === undefined) return value;
+        return typeof value === 'string' ? value : JSON.stringify(value);
+    }
+
+    private serializeTaskForGraphql<T extends Record<string, any>>(task: T): T {
+        return {
+            ...task,
+            formSchema: this.serializeJsonForGraphql(task.formSchema),
+            submissionData: this.serializeJsonForGraphql(task.submissionData),
+            subtasks: Array.isArray(task.subtasks)
+                ? task.subtasks.map((subtask: any) => ({
+                    ...subtask,
+                    formSchema: this.serializeJsonForGraphql(subtask.formSchema),
+                    submissionData: this.serializeJsonForGraphql(subtask.submissionData),
+                }))
+                : task.subtasks,
+        };
+    }
+
+    private resolveTaskResource(taskLike: { type?: string | null; formSchema?: unknown }) {
+        const parsedSchema = this.parseJsonLike(taskLike.formSchema);
+        if (parsedSchema && typeof parsedSchema === 'object' && !Array.isArray(parsedSchema)) {
+            const schema = parsedSchema as Record<string, unknown>;
+            const candidate = this.normalizeResource(
+                String(schema.resource ?? schema.resourceKey ?? schema.accessResource ?? ''),
+            );
+            if (candidate) return candidate;
+        }
+
+        const rawType = (taskLike.type || '').trim();
+        const resourceMatch = rawType.match(/^resource:(.+)$/i);
+        if (resourceMatch?.[1]) {
+            const resource = this.normalizeResource(resourceMatch[1]);
+            if (resource) return resource;
+        }
+
+        return 'TASK';
+    }
+
+    private resolveTaskCreatorId(taskLike: { formSchema?: unknown }) {
+        const parsedSchema = this.parseJsonLike(taskLike.formSchema);
+        if (!parsedSchema || typeof parsedSchema !== 'object' || Array.isArray(parsedSchema)) return 0;
+        return Number((parsedSchema as Record<string, unknown>).createdBy || 0);
+    }
+
+    private canPerformTaskResourceAction(
+        accessMap: Record<string, { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean }>,
+        resource: string,
+        action: 'canView' | 'canCreate' | 'canEdit' | 'canDelete',
+    ) {
+        const normalizedResource = this.normalizeResource(resource) || 'TASK';
+        if (normalizedResource === 'TASK') {
+            return this.canAccess(accessMap, 'TASK', action);
+        }
+
+        if (this.hasPolicyForAnyResource(accessMap, [normalizedResource])) {
+            return this.canAccess(accessMap, normalizedResource, action);
+        }
+
+        return this.canAccess(accessMap, 'TASK', action);
+    }
+
+    private async getProjectUserContext(projectId: number, userId: number) {
+        const projectUser = await this.prisma.projectUser.findUnique({
+            where: { projectId_userId: { projectId, userId } },
+            select: {
+                userId: true,
+                departmentId: true,
+                projectRoleId: true,
+                departmentRoleId: true,
+            },
+        });
+
+        if (!projectUser) return null;
+
+        const accessMap = await this.getAccessMapForProjectUser({
+            projectRoleId: projectUser.projectRoleId,
+            departmentRoleId: projectUser.departmentRoleId,
+            departmentId: projectUser.departmentId,
+        });
+
+        return { projectUser, accessMap };
+    }
+
     private async getAccessMapForProjectUser(projectUser: {
         projectRoleId: number | null;
         departmentRoleId: number | null;
         departmentId: number | null;
     }) {
         const accessMap: Record<string, { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean }> = {};
+        const department = projectUser.departmentId
+            ? await this.prisma.department.findUnique({
+                where: { id: projectUser.departmentId },
+                select: { name: true },
+            })
+            : null;
 
         const projectRolePermissions = projectUser.projectRoleId
             ? await this.prisma.permission.findMany({
@@ -131,6 +473,12 @@ export class ProjectService {
             });
         }
 
+        this.hardcodedTaskResources.forEach((resource) => {
+            if (!accessMap[resource]) {
+                this.setAccess(accessMap, resource, this.createEmptyAccess());
+            }
+        });
+
         return accessMap;
     }
 
@@ -143,6 +491,8 @@ export class ProjectService {
                 departments: [],
                 tasks: [],
                 workOrders: [],
+                fields: [],
+                effectiveAccessPolicies: [],
             };
         }
 
@@ -154,15 +504,28 @@ export class ProjectService {
 
         const canViewUsers = this.canAccess(accessMap, 'USER', 'canView');
         const canViewDepartments = this.canAccess(accessMap, 'DEPARTMENT', 'canView');
-        const canViewTasks = this.canAccess(accessMap, 'TASK', 'canView');
         const canViewWorkOrders = this.canAccess(accessMap, 'WORK_ORDER', 'canView');
+        const fieldPolicyDefined = this.hasPolicyForAnyResource(accessMap, this.projectFieldResources);
+        const canViewFields = fieldPolicyDefined
+            ? this.hasAccessForAnyResource(accessMap, this.projectFieldResources, 'canView')
+            : true;
+        const visibleTasks = (project.tasks || []).filter((task: any) => {
+            const isInViewerScope =
+                !task.departmentId ||
+                Number(task.departmentId) === Number(membership.departmentId) ||
+                Number(task.assignedTo) === Number(viewerUserId);
+
+            return isInViewerScope && this.canPerformTaskResourceAction(accessMap, this.resolveTaskResource(task), 'canView');
+        });
 
         return {
             ...project,
             users: canViewUsers ? project.users : (project.users || []).filter((user: any) => Number(user.userId) === Number(viewerUserId)),
             departments: canViewDepartments ? project.departments : [],
-            tasks: canViewTasks ? project.tasks : [],
+            tasks: visibleTasks.map((task: any) => this.serializeTaskForGraphql(task)),
             workOrders: canViewWorkOrders ? project.workOrders : [],
+            fields: canViewFields ? project.fields : [],
+            effectiveAccessPolicies: this.buildEffectiveAccessPolicies(accessMap),
         };
     }
 
@@ -394,6 +757,36 @@ export class ProjectService {
 
     // ─── ROLES ───────────────────────────────────────────────────
 
+    async getWorkOrderViewUrl(projectId: number, workOrderId: number) {
+        const workOrder = await this.prisma.workOrderPdf.findFirst({
+            where: { id: workOrderId, projectId },
+        });
+        if (!workOrder) {
+            throw new NotFoundException(`Work order with ID ${workOrderId} not found in project ${projectId}`);
+        }
+
+        return {
+            fileName: workOrder.fileName,
+            url: await this.storage.getPresignedUrl(workOrder.fileKey, workOrder.fileName),
+        };
+    }
+
+    async assertCanViewWorkOrder(projectId: number, user: { userId?: number; role?: string }) {
+        if (user?.role === 'admin') return true;
+
+        const userId = Number(user?.userId);
+        if (!userId) {
+            throw new ForbiddenException('Work order access denied');
+        }
+
+        const context = await this.getProjectUserContext(projectId, userId);
+        if (!context || !this.canAccess(context.accessMap, 'WORK_ORDER', 'canView')) {
+            throw new ForbiddenException('Work order access denied');
+        }
+
+        return true;
+    }
+
     async getRoles(projectId: number) {
         return this.prisma.projectRole.findMany({ where: { projectId } });
     }
@@ -561,8 +954,12 @@ export class ProjectService {
         canDelete: boolean,
     ) {
         await this.prisma.departmentRole.findUniqueOrThrow({ where: { id: roleId } });
-        const normalizedResource = resource.trim().toUpperCase();
+        const normalizedResource = this.normalizePolicyResource(resource);
         if (!normalizedResource) throw new ConflictException('Resource is required');
+        if (!this.allowedPolicyResources.includes(normalizedResource)) {
+            throw new ConflictException(`"${normalizedResource}" is not a configured hardcoded task/resource`);
+        }
+        const policyFlags = this.buildPolicyFlags(normalizedResource, { canView, canCreate, canEdit, canDelete });
 
         return this.prisma.departmentRolePolicy.upsert({
             where: {
@@ -571,14 +968,11 @@ export class ProjectService {
                     resource: normalizedResource,
                 },
             },
-            update: { canView, canCreate, canEdit, canDelete },
+            update: policyFlags,
             create: {
                 departmentRoleId: roleId,
                 resource: normalizedResource,
-                canView,
-                canCreate,
-                canEdit,
-                canDelete,
+                ...policyFlags,
             },
         });
     }
@@ -684,17 +1078,23 @@ export class ProjectService {
         canEdit: boolean,
         canDelete: boolean,
     ) {
+        const normalizedResource = this.normalizePolicyResource(resource);
+        if (!this.allowedPolicyResources.includes(normalizedResource)) {
+            throw new ConflictException(`"${normalizedResource}" is not a configured hardcoded task/resource`);
+        }
+        const policyFlags = this.buildPolicyFlags(normalizedResource, { canView, canCreate, canEdit, canDelete });
+
         // Prisma upsert cannot target a nullable member inside a composite unique
         // when that member is null, so we do a find+update/create for global permissions.
         if (departmentId === null) {
             const existing = await this.prisma.permission.findFirst({
-                where: { projectRoleId: roleId, resource, departmentId: null },
+                where: { projectRoleId: roleId, resource: normalizedResource, departmentId: null },
             });
 
             if (existing) {
                 return this.prisma.permission.update({
                     where: { id: existing.id },
-                    data: { canView, canCreate, canEdit, canDelete },
+                    data: policyFlags,
                 });
             }
 
@@ -702,11 +1102,8 @@ export class ProjectService {
                 data: {
                     projectRoleId: roleId,
                     departmentId: null,
-                    resource,
-                    canView,
-                    canCreate,
-                    canEdit,
-                    canDelete,
+                    resource: normalizedResource,
+                    ...policyFlags,
                 },
             });
         }
@@ -716,11 +1113,16 @@ export class ProjectService {
                 projectRoleId_departmentId_resource: {
                     projectRoleId: roleId,
                     departmentId,
-                    resource,
+                    resource: normalizedResource,
                 },
             },
-            update: { canView, canCreate, canEdit, canDelete },
-            create: { projectRoleId: roleId, departmentId, resource, canView, canCreate, canEdit, canDelete },
+            update: policyFlags,
+            create: {
+                projectRoleId: roleId,
+                departmentId,
+                resource: normalizedResource,
+                ...policyFlags,
+            },
         });
     }
 
@@ -734,31 +1136,15 @@ export class ProjectService {
 
     async getTasks(projectId: number, departmentId?: number, viewer?: { userId: number; role?: string }) {
         let scopedWhere: any = { projectId };
+        let accessMap: Record<string, { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean }> | null = null;
 
         if (viewer && viewer.role !== 'admin') {
-            const projectUser = await this.prisma.projectUser.findUnique({
-                where: { projectId_userId: { projectId, userId: viewer.userId } },
-                select: {
-                    userId: true,
-                    departmentId: true,
-                    projectRoleId: true,
-                    departmentRoleId: true,
-                },
-            });
-
-            if (!projectUser) {
+            const context = await this.getProjectUserContext(projectId, viewer.userId);
+            if (!context) {
                 return [];
             }
-
-            const accessMap = await this.getAccessMapForProjectUser({
-                projectRoleId: projectUser.projectRoleId,
-                departmentRoleId: projectUser.departmentRoleId,
-                departmentId: projectUser.departmentId,
-            });
-
-            if (!this.canAccess(accessMap, 'TASK', 'canView')) {
-                return [];
-            }
+            const projectUser = context.projectUser;
+            accessMap = context.accessMap;
 
             if (departmentId && projectUser.departmentId && departmentId !== projectUser.departmentId) {
                 return [];
@@ -769,13 +1155,14 @@ export class ProjectService {
                     ...scopedWhere,
                     OR: [
                         { departmentId: projectUser.departmentId },
+                        { departmentId: null },
                         { assignedTo: viewer.userId },
                     ],
                 };
             }
         }
 
-        return this.prisma.task.findMany({
+        const tasks = await this.prisma.task.findMany({
             where: {
                 ...scopedWhere,
                 ...(departmentId ? { departmentId } : {}),
@@ -791,6 +1178,15 @@ export class ProjectService {
             },
             orderBy: { createdAt: 'desc' },
         });
+
+        if (!viewer || viewer.role === 'admin' || !accessMap) {
+            return tasks.map((task) => this.serializeTaskForGraphql(task));
+        }
+
+        const viewerAccessMap = accessMap;
+        return tasks
+            .filter((task) => this.canPerformTaskResourceAction(viewerAccessMap, this.resolveTaskResource(task), 'canView'))
+            .map((task) => this.serializeTaskForGraphql(task));
     }
 
     async createTask(projectId: number, data: {
@@ -800,15 +1196,57 @@ export class ProjectService {
         assignedTo?: number;
         type?: string;
         formSchema?: string;
-    }) {
-        return this.prisma.task.create({
-            data: { projectId, ...data },
+    }, viewer?: { userId: number; role?: string }) {
+        let defaultDepartmentId: number | null = null;
+        let defaultAssignedTo: number | null = null;
+
+        if (viewer && viewer.role !== 'admin') {
+            const context = await this.getProjectUserContext(projectId, viewer.userId);
+            if (!context) {
+                throw new ForbiddenException('You are not assigned to this project');
+            }
+
+            const resource = this.resolveTaskResource({
+                type: data.type,
+                formSchema: data.formSchema,
+            });
+
+            if (!this.canPerformTaskResourceAction(context.accessMap, resource, 'canCreate')) {
+                throw new ForbiddenException(`You do not have create access for resource ${resource}`);
+            }
+
+            defaultDepartmentId = context.projectUser.departmentId ?? null;
+            defaultAssignedTo = viewer.userId;
+        }
+
+        const parsedFormSchema = this.parseJsonLike(data.formSchema);
+        let formSchemaForCreate = parsedFormSchema;
+        if (viewer?.userId) {
+            if (formSchemaForCreate && typeof formSchemaForCreate === 'object' && !Array.isArray(formSchemaForCreate)) {
+                formSchemaForCreate = {
+                    ...(formSchemaForCreate as Record<string, unknown>),
+                    createdBy: viewer.userId,
+                };
+            } else {
+                formSchemaForCreate = { createdBy: viewer.userId };
+            }
+        }
+
+        const task = await this.prisma.task.create({
+            data: {
+                projectId,
+                ...data,
+                departmentId: data.departmentId ?? defaultDepartmentId,
+                assignedTo: data.assignedTo ?? defaultAssignedTo,
+                formSchema: formSchemaForCreate as any,
+            },
             include: {
                 assignee: { select: { id: true, firstName: true, lastName: true, email: true } },
                 department: true,
                 subtasks: true,
             },
         });
+        return this.serializeTaskForGraphql(task);
     }
 
     async updateTask(id: number, data: {
@@ -817,21 +1255,85 @@ export class ProjectService {
         status?: string;
         assignedTo?: number;
         submissionData?: string;
-    }) {
-        await this.prisma.task.findUniqueOrThrow({ where: { id } });
-        return this.prisma.task.update({
+    }, viewer?: { userId: number; role?: string }) {
+        const existingTask = await this.prisma.task.findUniqueOrThrow({
             where: { id },
-            data,
+            select: {
+                id: true,
+                projectId: true,
+                type: true,
+                formSchema: true,
+                assignedTo: true,
+            },
+        });
+
+        if (viewer && viewer.role !== 'admin') {
+            const context = await this.getProjectUserContext(existingTask.projectId, viewer.userId);
+            if (!context) {
+                throw new ForbiddenException('You are not assigned to this project');
+            }
+
+            const resource = this.resolveTaskResource(existingTask);
+            const canEditResource = this.canPerformTaskResourceAction(context.accessMap, resource, 'canEdit');
+            const isAssignedWorker = Number(existingTask.assignedTo) === Number(viewer.userId);
+            const changesDefinitionOrDelegation =
+                data.title !== undefined ||
+                data.description !== undefined ||
+                data.assignedTo !== undefined;
+            const creatorId = this.resolveTaskCreatorId(existingTask);
+
+            if (data.assignedTo !== undefined && creatorId !== Number(viewer.userId)) {
+                throw new ForbiddenException('Only the task creator can delegate this task');
+            }
+
+            if ((data.status || '').toLowerCase() === 'done' && creatorId !== Number(viewer.userId)) {
+                throw new ForbiddenException('Only the task creator can validate task completion');
+            }
+
+            if (!canEditResource && !(isAssignedWorker && !changesDefinitionOrDelegation)) {
+                throw new ForbiddenException(`You do not have edit access for resource ${resource}`);
+            }
+        }
+
+        const parsedSubmissionData = this.parseJsonLike(data.submissionData);
+        const task = await this.prisma.task.update({
+            where: { id },
+            data: {
+                ...data,
+                submissionData: parsedSubmissionData as any,
+            },
             include: {
                 assignee: { select: { id: true, firstName: true, lastName: true, email: true } },
                 department: true,
                 subtasks: true,
             },
         });
+        return this.serializeTaskForGraphql(task);
     }
 
-    async removeTask(id: number) {
-        await this.prisma.task.findUniqueOrThrow({ where: { id } });
+    async removeTask(id: number, viewer?: { userId: number; role?: string }) {
+        const existingTask = await this.prisma.task.findUniqueOrThrow({
+            where: { id },
+            select: {
+                id: true,
+                projectId: true,
+                type: true,
+                formSchema: true,
+            },
+        });
+
+        if (viewer && viewer.role !== 'admin') {
+            const context = await this.getProjectUserContext(existingTask.projectId, viewer.userId);
+            if (!context) {
+                throw new ForbiddenException('You are not assigned to this project');
+            }
+
+            const resource = this.resolveTaskResource(existingTask);
+            if (!this.canPerformTaskResourceAction(context.accessMap, resource, 'canDelete')) {
+                throw new ForbiddenException(`You do not have delete access for resource ${resource}`);
+            }
+        }
+
         await this.prisma.task.delete({ where: { id } });
         return true;
     }

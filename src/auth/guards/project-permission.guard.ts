@@ -14,6 +14,8 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class ProjectPermissionGuard implements CanActivate {
+    private readonly defaultViewResources = new Set(['WORK_ORDER', 'TASK', 'SUBTASK', 'DEPARTMENT', 'USER', 'FIELD', 'PROJECT_FIELD']);
+
     constructor(
         private readonly reflector: Reflector,
         private readonly prisma: PrismaService,
@@ -148,6 +150,10 @@ export class ProjectPermissionGuard implements CanActivate {
         const permission = role?.permissions?.find((p) => p.resource === metadata.resource.toUpperCase());
         const departmentPolicy = departmentRole?.policies?.find((p) => p.resource === metadata.resource.toUpperCase());
         if (!permission && !departmentPolicy) {
+            const resourceKey = metadata.resource.toUpperCase();
+            if (metadata.action === 'view' && this.defaultViewResources.has(resourceKey)) {
+                return true;
+            }
             throw new ForbiddenException(`No permission defined for ${metadata.resource} on your role`);
         }
 

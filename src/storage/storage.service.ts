@@ -8,6 +8,7 @@ import { Readable } from 'stream';
 @Injectable()
 export class StorageService {
     private s3Client: S3Client;
+    private presignClient: S3Client;
     private bucketName: string;
     private isMinio: boolean;
 
@@ -40,6 +41,15 @@ export class StorageService {
         }
 
         this.s3Client = new S3Client(s3Config);
+
+        const presignConfig = { ...s3Config };
+        if (this.isMinio) {
+            const publicEndpoint = this.configService.get<string>('MINIO_PUBLIC_ENDPOINT') || 'localhost:9000';
+            presignConfig.endpoint = publicEndpoint.startsWith('http')
+                ? publicEndpoint
+                : `http://${publicEndpoint}`;
+        }
+        this.presignClient = new S3Client(presignConfig);
     }
 
     async getPresignedUrl(fileKey: string, fileName?: string): Promise<string> {
@@ -52,7 +62,7 @@ export class StorageService {
         });
 
         // URL expires in 15 minutes
-        return await getSignedUrl(this.s3Client, command, { expiresIn: 900 });
+        return await getSignedUrl(this.presignClient, command, { expiresIn: 900 });
     }
 
     async uploadFile(file: Express.Multer.File, folder: string = 'work-orders'): Promise<string> {
