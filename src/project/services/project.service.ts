@@ -65,6 +65,15 @@ export class ProjectService {
         'SCHEDULE_FOLDER_RENAME',
         'SCHEDULE_FOLDER_VIEW',
         'SCHEDULE_FOLDER_DELETE',
+        'L3_SCHEDULE_VIEW',
+        'L3_SCHEDULE_CREATE',
+        'L3_SCHEDULE_EDIT',
+        'L3_SCHEDULE_RENAME',
+        'L3_SCHEDULE_DELETE',
+        'LHS_FOLDER_CREATE',
+        'LHS_FOLDER_VIEW',
+        'LHS_FOLDER_EDIT',
+        'LHS_FOLDER_DELETE',
     ];
     private readonly hardcodedViewOnlyResources = [
         'DRAWING_VIEW_FOLDERS',
@@ -79,6 +88,8 @@ export class ProjectService {
         'CHALLAN_PDF_VIEW',
         'CHALLAN_REGISTER_VIEW',
         'SCHEDULE_FOLDER_VIEW',
+        'L3_SCHEDULE_VIEW',
+        'LHS_FOLDER_VIEW',
     ];
     private readonly allowedPolicyResources = [
         ...this.defaultUserViewResources,
@@ -212,6 +223,28 @@ export class ProjectService {
             RENAME_SCHEDULE_FOLDERS: 'SCHEDULE_FOLDER_RENAME',
             VIEW_SCHEDULE_FOLDERS: 'SCHEDULE_FOLDER_VIEW',
             DELETE_SCHEDULE_FOLDERS: 'SCHEDULE_FOLDER_DELETE',
+            VIEW_L3_SCHEDULE: 'L3_SCHEDULE_VIEW',
+            CREATE_L3_SCHEDULE: 'L3_SCHEDULE_CREATE',
+            EDIT_L3_SCHEDULE: 'L3_SCHEDULE_EDIT',
+            RENAME_L3_SCHEDULE: 'L3_SCHEDULE_RENAME',
+            DELETE_L3_SCHEDULE: 'L3_SCHEDULE_DELETE',
+            L3_CREATE_SCHEDULE: 'L3_SCHEDULE_CREATE',
+            L3_EDIT_SCHEDULE: 'L3_SCHEDULE_EDIT',
+            L3_RENAME_SCHEDULE: 'L3_SCHEDULE_RENAME',
+            L3_DELETE_SCHEDULE: 'L3_SCHEDULE_DELETE',
+            L3_VIEW_SCHEDULE: 'L3_SCHEDULE_VIEW',
+            LINE_HISTORY_SHEET_CREATE_FOLDER: 'LHS_FOLDER_CREATE',
+            LINE_HISTORY_SHEET_VIEW_FOLDER: 'LHS_FOLDER_VIEW',
+            LINE_HISTORY_SHEET_EDIT_FOLDER: 'LHS_FOLDER_EDIT',
+            LINE_HISTORY_SHEET_DELETE_FOLDER: 'LHS_FOLDER_DELETE',
+            CREATE_LINE_HISTORY_SHEET_FOLDERS: 'LHS_FOLDER_CREATE',
+            VIEW_LINE_HISTORY_SHEET_FOLDERS: 'LHS_FOLDER_VIEW',
+            EDIT_LINE_HISTORY_SHEET_FOLDERS: 'LHS_FOLDER_EDIT',
+            DELETE_LINE_HISTORY_SHEET_FOLDERS: 'LHS_FOLDER_DELETE',
+            LHS_CREATE_FOLDER: 'LHS_FOLDER_CREATE',
+            LHS_VIEW_FOLDER: 'LHS_FOLDER_VIEW',
+            LHS_EDIT_FOLDER: 'LHS_FOLDER_EDIT',
+            LHS_DELETE_FOLDER: 'LHS_FOLDER_DELETE',
         };
         return aliases[normalized] || normalized;
     }
